@@ -1,7 +1,8 @@
 # Hyper-parameters. Values marked (paper) come from Sec. 3.3; the rest are
 # not reported in the paper and are our choices, shared by every system.
 # Unreported values may be tuned ONLY on the URDU dev tasks (protocol.yaml
-# dev_tasks, scripts/tune_on_urdu.sh). Freeze this file before any Table 2 run.
+# dev_tasks, scripts/tune_on_urdu.sh). FROZEN after the URDU lr sweep; any
+# change invalidates every Table 2 run (hparams_sha256 in run.json).
 lambda_xling: 2.5        # (paper) language-aware SupCon weight for cross-lingual positives
 alpha: 1.0               # (paper) SupCon loss weight
 beta: 0.3                # (paper) speaker-adversarial loss weight
@@ -15,7 +16,7 @@ spk_dropout: 0.1
 lora_rank: 8
 lora_alpha: 16
 adapter_dim: 64
-lr: 1.0e-4
+lr: 1.0e-3                # selected on URDU dev (mean val UAR: 1e-4 92.50, 3e-4 93.75, 1e-3 96.25, 3e-3 93.75)
 weight_decay: 0.01
 max_steps: 3000          # optimizer-step budget, identical for every system
 warmup_steps: 100        # linear warm-up, then cosine decay to 0 at max_steps
