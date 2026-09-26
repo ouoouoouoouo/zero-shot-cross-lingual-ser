@@ -4,6 +4,9 @@
 # Only run this after configs/train.yaml has been frozen from the URDU dev sweep.
 set -euo pipefail
 GPUS=${@:-0}
+for l in EN CN DE FR UR; do
+  [ -f data/manifests/$l.csv ] || { echo "data/manifests/$l.csv missing" >&2; exit 1; }
+done
 for seed in 0 1 2; do
   for task in EN-DE CN-DE FR-DE EN-FR CN-FR DE-FR EN-CN DE-CN FR-CN; do
     for system in baseline1 baseline2 proposed proposed_no_spk proposed_no_supcon upper_bound; do

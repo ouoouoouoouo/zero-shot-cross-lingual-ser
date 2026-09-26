@@ -17,7 +17,7 @@ ap.add_argument("--logdir", default="logs")
 a = ap.parse_args()
 
 jobs = [l.strip() for l in sys.stdin if l.strip() and not l.startswith("#")]
-Path(a.logdir).mkdir(exist_ok=True)
+Path(a.logdir).mkdir(parents=True, exist_ok=True)
 free, running, failed = list(a.gpus), {}, []
 for i, cmd in enumerate(jobs):
     while not free:

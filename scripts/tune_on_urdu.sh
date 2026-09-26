@@ -5,6 +5,7 @@
 # Pick ONE lr (best mean over backbones) and write it into configs/train.yaml.
 set -euo pipefail
 GPUS=${@:-0}
+[ -f data/manifests/UR.csv ] || { echo "data/manifests/UR.csv missing: python -m xlser.prepare --lang UR --root <dir>" >&2; exit 1; }
 for lr in 1e-4 3e-4 1e-3 3e-3; do
   for task in EN-UR CN-UR DE-UR FR-UR; do
     for seed in 0 1; do
