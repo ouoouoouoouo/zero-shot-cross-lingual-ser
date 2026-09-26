@@ -48,3 +48,9 @@ def test_lr_schedule_warmup_then_cosine_to_zero():
 def test_uar_ignores_classes_absent_from_eval_set():
     from xlser.metrics import uar_f1
     assert uar_f1([0, 0, 1, 1], [0, 0, 1, 0], 4)["uar"] == 75.0
+
+
+def test_hparams_hash_ignores_seed_only():
+    from xlser.train import hparams_sha256
+    assert hparams_sha256({"lr": 1e-3, "seed": 0}) == hparams_sha256({"lr": 1e-3, "seed": 2})
+    assert hparams_sha256({"lr": 1e-3, "seed": 0}) != hparams_sha256({"lr": 3e-3, "seed": 0})

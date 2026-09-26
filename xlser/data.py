@@ -32,7 +32,12 @@ class SERDataset(Dataset):
         self.spk_idx = {s: i for i, s in enumerate(speakers)}
         self.max_len = int(max_sec * SR)
         self.train = train
+        self.seed = seed
         self.rng = np.random.default_rng(seed)
+
+    def init_worker(self, worker_id):
+        """Give each DataLoader worker its own crop RNG (otherwise all copies repeat the same offsets)."""
+        self.rng = np.random.default_rng((self.seed, worker_id))
 
     def __len__(self):
         return len(self.rows)

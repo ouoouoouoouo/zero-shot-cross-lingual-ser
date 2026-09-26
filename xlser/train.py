@@ -13,10 +13,12 @@ import hashlib
 import json
 import math
 import random
+import subprocess
 import time
 from pathlib import Path
 
 import numpy as np
+import soundfile as sf
 import torch
 import torch.nn.functional as F
 import yaml
@@ -30,6 +32,19 @@ from .protocol import build_plan, load_protocol
 from .sampler import HierarchicalBatchSampler, RandomBatchSampler
 
 
+def hparams_sha256(hp):
+    """Fingerprint of everything that should be identical across a results table (seed excluded)."""
+    return hashlib.sha256(json.dumps({k: v for k, v in hp.items() if k != "seed"}, sort_keys=True).encode()).hexdigest()
+
+
+def git_commit():
+    try:
+        return subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True,
+                              cwd=Path(__file__).parent).stdout.strip()
+    except OSError:
+        return ""
+
+
 def seed_all(seed):
     random.seed(seed)
     np.random.seed(seed)
@@ -37,10 +52,15 @@ def seed_all(seed):
 
 
 @torch.no_grad()
-def predict(model, rows, plan, hp, device):
+def predict(model, rows, plan, hp, device, batch_size=None):
+    """batch_size=1 makes every prediction independent of the other utterances:
+    group-norm wav2vec 2.0 checkpoints run without an attention mask, so zero
+    padding (i.e. the other utterances' lengths) would otherwise leak into each
+    output. Used for all target evaluation; val batches are length-sorted."""
     ds = SERDataset(rows, plan.labels, max_sec=hp["max_eval_sec"], train=False)
-    order = sorted(range(len(ds)), key=lambda i: rows[i]["path"])
-    dl = DataLoader(torch.utils.data.Subset(ds, order), batch_size=hp["eval_batch_size"],
+    order = sorted(range(len(ds)), key=lambda i: (sf.info(rows[i]["path"]).frames / sf.info(rows[i]["path"]).samplerate,
+                                                  rows[i]["path"]))
+    dl = DataLoader(torch.utils.data.Subset(ds, order), batch_size=batch_size or hp["eval_batch_size"],
                     collate_fn=collate, num_workers=hp["num_workers"])
     model.eval()
     y_true, y_pred = np.zeros(len(ds), int), np.zeros(len(ds), int)
@@ -87,7 +107,7 @@ def fit(model, plan, hp, device, log, tracker=None):
     else:
         sampler = RandomBatchSampler(len(train_rows), bs, seed=hp["seed"])
     dl = DataLoader(ds, batch_sampler=sampler, collate_fn=collate, num_workers=hp["num_workers"],
-                    persistent_workers=hp["num_workers"] > 0)
+                    persistent_workers=hp["num_workers"] > 0, worker_init_fn=ds.init_worker)
     lang_id = {l: i for i, l in enumerate(plan.train_langs)}
 
     params = [p for p in model.parameters() if p.requires_grad]
@@ -180,7 +200,7 @@ def main(argv=None):
                 pass
         hp[k] = v
     seed_all(hp["seed"])
-    hp_sha = hashlib.sha256(json.dumps(hp, sort_keys=True).encode()).hexdigest()
+    hp_sha = hparams_sha256(hp)
 
     plan = build_plan(protocol, a.task, a.system, a.manifest_dir, backbone=a.backbone)
     run_name = f"{a.system}_seed{hp['seed']}" + (f"_{a.tag}" if a.tag else "")
@@ -213,7 +233,7 @@ def main(argv=None):
 
     # ---- target evaluation: first and only access to target audio ----
     n = len(plan.labels)
-    y_true, y_pred = predict(model, list(plan.test), plan, hp, a.device)
+    y_true, y_pred = predict(model, list(plan.test), plan, hp, a.device, batch_size=1)
     result = {"target_test": uar_f1(y_true, y_pred, n)}
     with open(out / "target_test_predictions.csv", "w", newline="") as f:
         w = csv.writer(f)
@@ -221,11 +241,11 @@ def main(argv=None):
         for r, p in zip(plan.test, y_pred):
             w.writerow([r["utt_id"], r["label"], plan.labels[p]])
     if plan.zero_shot:  # supplementary: whole target corpus (never trained on, so also unseen)
-        yt, yp = predict(model, list(plan.target_all), plan, hp, a.device)
+        yt, yp = predict(model, list(plan.target_all), plan, hp, a.device, batch_size=1)
         result["target_all_supplementary"] = uar_f1(yt, yp, n)
 
     summary = {"task": a.task, "system": a.system, "backbone": plan.backbone, "tag": a.tag, "dev": plan.dev,
-               "protocol_sha256": plan.protocol_sha256, "hparams_sha256": hp_sha, "hparams": hp, "audit": audit,
+               "protocol_sha256": plan.protocol_sha256, "hparams_sha256": hp_sha, "git_commit": git_commit(), "hparams": hp, "audit": audit,
                **train_info, **result}
     (out / "run.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False))
     if tracker is not None:

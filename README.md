@@ -16,7 +16,7 @@ sha256 寫進 `run.json`，`scripts/collect_results.py` 會拒收 protocol 不�
 | Speaker classifier 的類別 | 只有訓練語言的 speaker |
 | Normalization | 逐句 zero-mean / unit-variance，不算任何語料層級的統計量 |
 | Early stopping / model selection | EN, CN, FR, UR 的 **val** split（各語言 UAR 平均） |
-| 最終報告 | **只有** German EMO-DB 的 test split（38 句），訓練結束、還原最佳 checkpoint 後才讀取 |
+| 最終報告 | **只有** German EMO-DB 的 test split（38 句），訓練結束、還原最佳 checkpoint 後才讀取；逐句（batch size 1）推論，每句預測與其他 test 句無關 |
 
 - 目標語言在 zero-shot 系統中不會出現在 train、sampler、speaker map、normalization 或
   early stopping。`xlser/protocol.py` 的 `check_isolation` 會用資料列本身再驗一次

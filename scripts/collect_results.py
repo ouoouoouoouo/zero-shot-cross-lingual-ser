@@ -35,7 +35,8 @@ for f in sorted(Path(a.runs).glob("*/*/run.json")):
         continue
     key = (r["task"], r.get("tag", "") if a.dev else r["system"])
     res[key].append((r["target_test"]["uar"], r["target_test"]["f1"], r["best_val_mean_uar"]))
-    hps[r.get("hparams_sha256", "?")].add(f"{r['task']}/{r['system']}")
+    hp = {k: v for k, v in r["hparams"].items() if k != "seed"}
+    hps[hashlib.sha256(json.dumps(hp, sort_keys=True).encode()).hexdigest()].add(f"{r['task']}/{r['system']}")
 
 
 def cell(v):
