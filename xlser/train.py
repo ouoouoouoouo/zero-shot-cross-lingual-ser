@@ -49,8 +49,8 @@ def predict(model, rows, plan, hp, device):
     return y_true, y_pred
 
 
-def fit(model, plan, hp, device, log):
-    """Uses plan.train and plan.val only."""
+def fit(model, plan, hp, device, log, tracker=None):
+    """Uses plan.train and plan.val only. `tracker` is an optional wandb run."""
     train_rows = list(plan.train)
     ds = SERDataset(train_rows, plan.labels, plan.speakers, hp["max_train_sec"], train=True, seed=hp["seed"])
     bs = hp["n_lang"] * hp["n_cls"] * hp["n_sam"]
@@ -97,6 +97,10 @@ def fit(model, plan, hp, device, log):
                "sec": round(time.time() - t0, 1)}
         history.append(rec)
         log(json.dumps(rec))
+        if tracker is not None:
+            tracker.log({"epoch": epoch, **{f"train/{k}": rec[k] for k in sums},
+                         "val/mean_uar": val["mean_uar"],
+                         **{f"val/uar_{l}": m["uar"] for l, m in val.items() if l != "mean_uar"}}, step=epoch)
         if val["mean_uar"] > best:
             best, best_state, bad = val["mean_uar"], model.trainable_state_dict(), 0
         else:
@@ -120,6 +124,9 @@ def main(argv=None):
     ap.add_argument("--backbone", help="override the protocol's source-language backbone (e.g. tiny-random)")
     ap.add_argument("--set", nargs="*", default=[], metavar="KEY=VALUE", help="override hparams, e.g. epochs=2")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
+    ap.add_argument("--wandb", action="store_true", help="log to Weights & Biases (off by default)")
+    ap.add_argument("--wandb-project", default="zero-shot-xling-ser")
+    ap.add_argument("--wandb-entity", default=None)
     a = ap.parse_args(argv)
 
     protocol = load_protocol(a.protocol)
@@ -148,10 +155,20 @@ def main(argv=None):
     audit = plan.audit()
     log(json.dumps({"task": a.task, "system": a.system, "backbone": plan.backbone, "audit": audit}))
 
+    tracker = None
+    if a.wandb:
+        import wandb
+        tracker = wandb.init(
+            project=a.wandb_project, entity=a.wandb_entity, group=a.task, job_type=a.system,
+            name=f"{a.task}_{a.system}_seed{hp['seed']}", dir=str(out),
+            tags=[a.task, a.system, "zero-shot" if plan.zero_shot else "upper-bound"],
+            config={"task": a.task, "system": a.system, "backbone": plan.backbone,
+                    "protocol_sha256": plan.protocol_sha256, "audit": audit, **hp})
+
     model = SERModel(plan.backbone, len(plan.labels), len(plan.speakers) if plan.spkadv else 0,
                      hp["lora_rank"], hp["lora_alpha"], hp["adapter_dim"], hp["spk_hidden"],
                      hp["spk_dropout"], hp["grl_coeff"]).to(a.device)
-    train_info = fit(model, plan, hp, a.device, log)
+    train_info = fit(model, plan, hp, a.device, log, tracker)
 
     # ---- target evaluation: first and only access to target audio ----
     n = len(plan.labels)
@@ -170,6 +187,11 @@ def main(argv=None):
                "protocol_sha256": plan.protocol_sha256, "hparams": hp, "audit": audit,
                **train_info, **result}
     (out / "run.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False))
+    if tracker is not None:
+        # target numbers go to the run summary only, after training has finished
+        tracker.summary.update({"best_val_mean_uar": train_info["best_val_mean_uar"],
+                                **{f"{k}/{m}": v[m] for k, v in result.items() for m in ("uar", "f1")}})
+        tracker.finish()
     torch.save(model.trainable_state_dict(), out / "trainable_params.pt")
     log(f"[{a.task} {a.system}] target test UAR {result['target_test']['uar']:.2f}  "
         f"F1 {result['target_test']['f1']:.2f}  -> {out / 'run.json'}")

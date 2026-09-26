@@ -6,3 +6,4 @@ soundfile
 scikit-learn
 pyyaml
 pytest
+wandb  # optional, only needed with --wandb

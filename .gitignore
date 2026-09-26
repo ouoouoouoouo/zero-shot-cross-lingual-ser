@@ -6,3 +6,4 @@ runs/
 data/raw/
 *.wav
 *.mp4
+wandb/

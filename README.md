@@ -77,6 +77,30 @@ bash scripts/run_all.sh                     # 9 tasks x 6 systems
 python scripts/collect_results.py runs      # Table 2 格式
 ```
 
+### 在 GPU cluster 上跑
+
+```bash
+git clone -b claude/wonderful-wozniak-i2rpae https://github.com/ouoouoouoouo/zero-shot-cross-lingual-ser.git
+cd zero-shot-cross-lingual-ser && pip install -r requirements.txt && pytest -q
+```
+
+- 計算節點若不能連外網，先在登入節點下載 backbone，再設 `HF_HUB_OFFLINE=1`：
+  `python -c "from transformers import Wav2Vec2Model as M; [M.from_pretrained(n) for n in ['facebook/wav2vec2-base-960h','TencentGameMate/chinese-wav2vec2-base','facebook/wav2vec2-base-de-voxpopuli-v2','facebook/wav2vec2-base-fr-voxpopuli']]"`
+- manifest 存的是絕對路徑，請在 cluster 上重新跑 `xlser.prepare`；
+  `data/manifests/*.split.sha256` 應與其他機器一致。
+- 每個 (task, system, seed) 是獨立的 process，可以直接各開一個 job 平行跑。
+
+### Weights & Biases（選用）
+
+```bash
+wandb login
+python -m xlser.train --task EN-DE --system proposed --wandb [--wandb-project P --wandb-entity E]
+```
+
+每個 epoch 記錄 train loss（ce / supcon / spk）和訓練語言的 val UAR；run 以 task 分 group、
+system 為 job type，config 中含 protocol sha256 與各階段的資料審計。目標語言的 test UAR / F1
+只在訓練結束後寫進 run summary，訓練曲線中不會出現目標語言。`WANDB_MODE=offline` 可離線記錄。
+
 第一步只有 EMO-DB 時：`bash scripts/run_emodb_pipeline.sh /data/emodb` 會建 DE manifest
 並跑三個 *→DE 的 Upper Bound（論文：97.22 / 97.22 / 95.44 UAR）。
 
