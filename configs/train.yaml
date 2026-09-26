@@ -1,0 +1,25 @@
+# Hyper-parameters. Values marked (paper) come from Sec. 3.3; the rest are
+# not reported in the paper and are our choices, shared by every system.
+lambda_xling: 2.5        # (paper) language-aware SupCon weight for cross-lingual positives
+alpha: 1.0               # (paper) SupCon loss weight
+beta: 0.3                # (paper) speaker-adversarial loss weight
+n_lang: 3                # (paper) hierarchical sampler
+n_cls: 4                 # (paper)
+n_sam: 3                 # (paper) -> 36 utterances per batch (also used by random batches)
+temperature: 0.07
+grl_coeff: 1.0
+spk_hidden: 256
+spk_dropout: 0.1
+lora_rank: 8
+lora_alpha: 16
+adapter_dim: 64
+lr: 1.0e-4
+weight_decay: 0.01
+epochs: 30
+patience: 5              # early stopping on mean per-language val UAR of the training languages
+grad_clip: 5.0
+max_train_sec: 6.0       # random crop during training
+max_eval_sec: 15.0       # deterministic head crop for val / test
+eval_batch_size: 16
+num_workers: 4
+seed: 0

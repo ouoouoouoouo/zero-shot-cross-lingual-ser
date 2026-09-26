@@ -1,0 +1,51 @@
+# Zero-shot cross-lingual SER protocol (Mi, Ma & Toda, arXiv:2606.06200).
+# THIS FILE IS FROZEN. Every number in a results table must come from a run
+# whose protocol_sha256 (logged in run.json) matches the hash of this file.
+
+labels: [neutral, happy, angry, sad]      # label index = position in this list
+
+split_seed: 20260604                      # seed for every non-official split
+
+# One corpus per language. `split` = how train/val/test are produced.
+#   official   : use the corpus' own partition (MELD)
+#   stratified : fixed-seed stratified random split with exact counts
+corpora:
+  EN: {corpus: meld,  split: official,   expected: {train: 8245,  val: 897,  test: 2211}}
+  CN: {corpus: esd,   split: stratified, strata: [speaker, label], expected: {train: 11200, val: 1400, test: 1400}}
+  DE: {corpus: emodb, split: stratified, strata: [label],          expected: {train: 266,   val: 35,   test: 38}}
+  FR: {corpus: cafe,  split: stratified, strata: [label],          expected: {train: 420,   val: 42,   test: 42}}
+  UR: {corpus: urdu,  split: stratified, strata: [label],          expected: {train: 300,   val: 20,   test: 80}}
+
+# Language-matched wav2vec 2.0 Base per SOURCE language (paper Sec. 3.3).
+backbones:
+  EN: facebook/wav2vec2-base-960h
+  CN: TencentGameMate/chinese-wav2vec2-base
+  DE: facebook/wav2vec2-base-de-voxpopuli-v2
+  FR: facebook/wav2vec2-base-fr-voxpopuli
+
+# The nine tasks of Table 1. non_target = every language except source/target.
+# expected_* reproduce Table 1 and are checked when the protocol is built.
+tasks:
+  EN-DE: {source: EN, target: DE, expected_train: 20165, expected_speakers: 288}
+  CN-DE: {source: CN, target: DE, expected_train: 20165, expected_speakers: 288}
+  FR-DE: {source: FR, target: DE, expected_train: 20165, expected_speakers: 288}
+  EN-FR: {source: EN, target: FR, expected_train: 20011, expected_speakers: 286}
+  CN-FR: {source: CN, target: FR, expected_train: 20011, expected_speakers: 286}
+  DE-FR: {source: DE, target: FR, expected_train: 20011, expected_speakers: 286}
+  EN-CN: {source: EN, target: CN, expected_train: 9231,  expected_speakers: 288}
+  DE-CN: {source: DE, target: CN, expected_train: 9231,  expected_speakers: 288}
+  FR-CN: {source: FR, target: CN, expected_train: 9231,  expected_speakers: 288}
+
+# What each stage may see. `target` never appears in a zero-shot stage.
+#   train / sampler / speaker-id map / normalisation : `train_langs`
+#   early stopping / model selection                 : val splits of `train_langs`
+#   final report                                     : target test split
+# Baselines use plain shuffled batches; the hierarchical cross-lingual
+# sampler (Sec. 2.2) belongs to the proposed method and its ablations.
+systems:
+  baseline1:        {train_langs: [source],             sampler: random,       supcon: false, spkadv: false}
+  baseline2:        {train_langs: [source, non_target], sampler: random,       supcon: false, spkadv: false}
+  proposed:         {train_langs: [source, non_target], sampler: hierarchical, supcon: true,  spkadv: true}
+  proposed_no_spk:  {train_langs: [source, non_target], sampler: hierarchical, supcon: true,  spkadv: false}
+  proposed_no_supcon: {train_langs: [source, non_target], sampler: hierarchical, supcon: false, spkadv: true}
+  upper_bound:      {train_langs: [target],             sampler: random,       supcon: false, spkadv: false, zero_shot: false}
