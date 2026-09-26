@@ -39,7 +39,7 @@ def test_no_target_audio_read_before_final_evaluation(dummy, monkeypatch, tmp_pa
     monkeypatch.setattr(train, "fit", fit_then_mark)
     train.main(["--task", "EN-DE", "--system", "proposed", "--manifest-dir", str(dummy / "manifests"),
                 "--out", str(tmp_path), "--backbone", "tiny-random",
-                "--set", "epochs=2", "num_workers=0"])
+                "--set", "max_steps=6", "eval_every=3", "num_workers=0"])
     fit_reads = [p for ph, p in reads if ph == "fit"]
     assert fit_reads and not any("/emodb/" in p for p in fit_reads)
     assert any("/emodb/" in p for ph, p in reads if ph == "eval")

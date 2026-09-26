@@ -36,6 +36,17 @@ tasks:
   DE-CN: {source: DE, target: CN, expected_train: 9231,  expected_speakers: 288}
   FR-CN: {source: FR, target: CN, expected_train: 9231,  expected_speakers: 288}
 
+# Hyper-parameter selection (configs/train.yaml: lr, warm-up, step budget, ...)
+# may look ONLY at these dev tasks: the upper_bound system trained and scored on
+# URDU with each source backbone. UR is never the target of the nine tasks, so
+# no DE / FR / CN number can influence the hyper-parameters. Dev runs never go
+# into Table 2.
+dev_tasks:
+  EN-UR: {source: EN, target: UR}
+  CN-UR: {source: CN, target: UR}
+  DE-UR: {source: DE, target: UR}
+  FR-UR: {source: FR, target: UR}
+
 # What each stage may see. `target` never appears in a zero-shot stage.
 #   train / sampler / speaker-id map / normalisation : `train_langs`
 #   early stopping / model selection                 : val splits of `train_langs`

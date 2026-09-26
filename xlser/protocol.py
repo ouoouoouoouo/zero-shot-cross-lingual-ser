@@ -50,6 +50,7 @@ def read_manifest(manifest_dir, lang):
 class RunPlan:
     task: str
     system: str
+    dev: bool
     source: str
     target: str
     non_target: tuple
@@ -71,6 +72,7 @@ class RunPlan:
         """Human-readable record of what each stage saw (written to run.json)."""
         langs = lambda rows: sorted({r["lang"] for r in rows})
         return {
+            "dev": self.dev,
             "zero_shot": self.zero_shot,
             "target": self.target,
             "train": langs(self.train),
@@ -89,9 +91,13 @@ def speaker_key(row):
 
 
 def build_plan(protocol, task, system, manifest_dir="data/manifests", backbone=None):
-    if task not in protocol["tasks"]:
-        raise KeyError(f"unknown task {task}; choose from {list(protocol['tasks'])}")
-    t, sysc = protocol["tasks"][task], protocol["systems"][system]
+    dev = task in protocol["dev_tasks"]
+    if dev and system != "upper_bound":
+        raise ValueError(f"dev task {task} is for hyper-parameter selection and only runs upper_bound")
+    if not dev and task not in protocol["tasks"]:
+        raise KeyError(f"unknown task {task}; choose from {list(protocol['tasks']) + list(protocol['dev_tasks'])}")
+    t = protocol["dev_tasks" if dev else "tasks"][task]
+    sysc = protocol["systems"][system]
     source, target = t["source"], t["target"]
     non_target = tuple(l for l in protocol["corpora"] if l not in (source, target))
     roles = {"source": (source,), "non_target": non_target, "target": (target,)}
@@ -109,7 +115,7 @@ def build_plan(protocol, task, system, manifest_dir="data/manifests", backbone=N
     test = [r for r in target_rows if r["split"] == "test"]
 
     plan = RunPlan(
-        task=task, system=system, source=source, target=target, non_target=non_target,
+        task=task, system=system, dev=dev, source=source, target=target, non_target=non_target,
         train_langs=train_langs, zero_shot=zero_shot,
         backbone=backbone or protocol["backbones"][source],
         sampler=sysc["sampler"], supcon=sysc["supcon"], spkadv=sysc["spkadv"],
@@ -153,7 +159,7 @@ def check_isolation(plan, protocol):
             raise LeakageError("upper bound: test files overlap train/val")
 
     # Table 1 reproduction check (source + non-target systems only)
-    t = protocol["tasks"][plan.task]
+    t = protocol["tasks"].get(plan.task, {})
     if plan.zero_shot and len(plan.train_langs) == len(protocol["corpora"]) - 1:
         got = (len(plan.train), len(plan.speakers))
         exp = (t["expected_train"], t["expected_speakers"])

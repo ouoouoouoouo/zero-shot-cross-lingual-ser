@@ -71,3 +71,16 @@ def test_hierarchical_sampler_on_plan(protocol, manifests):
         for lang in {r["lang"] for r in rows}:
             for label in plan.labels:
                 assert sum(r["lang"] == lang and r["label"] == label for r in rows) == 3
+
+
+def test_dev_tasks_only_touch_urdu(protocol, manifests):
+    for task in protocol["dev_tasks"]:
+        p = build_plan(protocol, task, "upper_bound", manifests)
+        assert p.dev and {r["lang"] for r in p.train + p.val + p.test} == {"UR"}
+        assert p.backbone == protocol["backbones"][task.split("-")[0]]
+    assert all(t["target"] != "UR" for t in protocol["tasks"].values())
+
+
+def test_dev_tasks_reject_zero_shot_systems(protocol, manifests):
+    with pytest.raises(ValueError):
+        build_plan(protocol, "EN-UR", "proposed", manifests)

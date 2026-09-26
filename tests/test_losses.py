@@ -37,3 +37,14 @@ def test_cross_lingual_pairs_weigh_more():
     y = torch.tensor([0, 0, 0, 1])
     g = torch.tensor([0, 0, 1, 0])
     assert language_aware_supcon(h, y, g, 0.1, 2.5) > language_aware_supcon(h, y, g, 0.1, 1.0)
+
+
+def test_lr_schedule_warmup_then_cosine_to_zero():
+    from xlser.train import lr_lambda
+    f = lr_lambda({"warmup_steps": 10, "max_steps": 110})
+    assert f(0) == 0.1 and f(9) == 1.0 and abs(f(60) - 0.5) < 1e-9 and f(110) < 1e-12
+
+
+def test_uar_ignores_classes_absent_from_eval_set():
+    from xlser.metrics import uar_f1
+    assert uar_f1([0, 0, 1, 1], [0, 0, 1, 0], 4)["uar"] == 75.0

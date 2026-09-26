@@ -9,7 +9,9 @@ Order of operations (the only order the target test rows are touched in):
 """
 import argparse
 import csv
+import hashlib
 import json
+import math
 import random
 import time
 from pathlib import Path
@@ -49,8 +51,33 @@ def predict(model, rows, plan, hp, device):
     return y_true, y_pred
 
 
+def lr_lambda(hp):
+    """Linear warm-up, then cosine decay to 0 at max_steps."""
+    warm, total = hp["warmup_steps"], hp["max_steps"]
+
+    def f(step):
+        if step < warm:
+            return (step + 1) / warm
+        return 0.5 * (1 + math.cos(math.pi * min(1.0, (step - warm) / max(1, total - warm))))
+    return f
+
+
+def batches(dl, sampler):
+    """Endless stream of training batches; reshuffles every pass."""
+    epoch = 0
+    while True:
+        sampler.set_epoch(epoch)
+        yield from dl
+        epoch += 1
+
+
 def fit(model, plan, hp, device, log, tracker=None):
-    """Uses plan.train and plan.val only. `tracker` is an optional wandb run."""
+    """Uses plan.train and plan.val only. `tracker` is an optional wandb run.
+
+    Budget is counted in optimizer steps (not epochs), so every system gets the
+    same number of updates regardless of how much training data it has. The val
+    set is scored every `eval_every` steps; training stops after `patience`
+    evaluations without improvement or at `max_steps`."""
     train_rows = list(plan.train)
     ds = SERDataset(train_rows, plan.labels, plan.speakers, hp["max_train_sec"], train=True, seed=hp["seed"])
     bs = hp["n_lang"] * hp["n_cls"] * hp["n_sam"]
@@ -59,57 +86,68 @@ def fit(model, plan, hp, device, log, tracker=None):
                                            num_batches=max(1, len(train_rows) // bs), seed=hp["seed"])
     else:
         sampler = RandomBatchSampler(len(train_rows), bs, seed=hp["seed"])
-    dl = DataLoader(ds, batch_sampler=sampler, collate_fn=collate, num_workers=hp["num_workers"])
+    dl = DataLoader(ds, batch_sampler=sampler, collate_fn=collate, num_workers=hp["num_workers"],
+                    persistent_workers=hp["num_workers"] > 0)
     lang_id = {l: i for i, l in enumerate(plan.train_langs)}
 
     params = [p for p in model.parameters() if p.requires_grad]
     opt = torch.optim.AdamW(params, lr=hp["lr"], weight_decay=hp["weight_decay"])
-    best, best_state, bad, history = -1.0, None, 0, []
+    sched = torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda(hp))
+    losses = ["ce"] + (["supcon"] if plan.supcon else []) + (["spk"] if plan.spkadv else [])
+    best, best_step, best_state, bad, history = -1.0, 0, None, 0, []
     val_rows = list(plan.val)
-    for epoch in range(hp["epochs"]):
-        sampler.set_epoch(epoch)
-        model.train()
-        t0, sums, steps = time.time(), {"ce": 0.0, "supcon": 0.0, "spk": 0.0}, 0
-        for b in dl:
-            out = model(b["wav"].to(device), b["lengths"].to(device))
-            y = b["label"].to(device)
-            loss = ce = F.cross_entropy(out["emotion"], y)
-            sums["ce"] += ce.item()
-            if plan.supcon:
-                langs = torch.tensor([lang_id[l] for l in b["lang"]], device=device)
-                sc = language_aware_supcon(out["h"], y, langs, hp["temperature"], hp["lambda_xling"])
-                loss = loss + hp["alpha"] * sc
-                sums["supcon"] += sc.item()
-            if plan.spkadv:
-                spk = F.cross_entropy(out["speaker"], b["speaker"].to(device))  # GRL inside the model
-                loss = loss + hp["beta"] * spk
-                sums["spk"] += spk.item()
-            opt.zero_grad()
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(params, hp["grad_clip"])
-            opt.step()
-            steps += 1
+    sums, n, t0 = dict.fromkeys(losses + ["grad_norm", "h_norm"], 0.0), 0, time.time()
+    model.train()
+    for step, b in enumerate(batches(dl, sampler), start=1):
+        out = model(b["wav"].to(device), b["lengths"].to(device))
+        y = b["label"].to(device)
+        terms = {"ce": F.cross_entropy(out["emotion"], y)}
+        loss = terms["ce"]
+        if plan.supcon:
+            langs = torch.tensor([lang_id[l] for l in b["lang"]], device=device)
+            terms["supcon"] = language_aware_supcon(out["h"], y, langs, hp["temperature"], hp["lambda_xling"])
+            loss = loss + hp["alpha"] * terms["supcon"]
+        if plan.spkadv:
+            terms["spk"] = F.cross_entropy(out["speaker"], b["speaker"].to(device))  # GRL inside the model
+            loss = loss + hp["beta"] * terms["spk"]
+        opt.zero_grad()
+        loss.backward()
+        gn = torch.nn.utils.clip_grad_norm_(params, hp["grad_clip"])
+        opt.step()
+        sched.step()
+        for k, v in terms.items():
+            sums[k] += v.item()
+        sums["grad_norm"] += gn.item()
+        sums["h_norm"] += out["h"].detach().norm(dim=-1).mean().item()
+        n += 1
+        if step % hp["eval_every"] and step != hp["max_steps"]:
+            continue
+
         y_true, y_pred = predict(model, val_rows, plan, hp, device)
+        model.train()
         val = per_language(y_true, y_pred, [r["lang"] for r in val_rows], len(plan.labels))
-        rec = {"epoch": epoch, **{k: v / max(steps, 1) for k, v in sums.items()},
-               "val_mean_uar": val["mean_uar"],
+        rec = {"step": step, **{k: round(v / n, 4) for k, v in sums.items()}, "lr": sched.get_last_lr()[0],
+               "val_mean_uar": round(val["mean_uar"], 2),
                "val_uar": {l: round(m["uar"], 2) for l, m in val.items() if l != "mean_uar"},
                "sec": round(time.time() - t0, 1)}
         history.append(rec)
         log(json.dumps(rec))
         if tracker is not None:
-            tracker.log({"epoch": epoch, **{f"train/{k}": rec[k] for k in sums},
+            tracker.log({**{f"train/{k}": v / n for k, v in sums.items()}, "train/lr": rec["lr"],
                          "val/mean_uar": val["mean_uar"],
-                         **{f"val/uar_{l}": m["uar"] for l, m in val.items() if l != "mean_uar"}}, step=epoch)
+                         **{f"val/uar_{l}": m["uar"] for l, m in val.items() if l != "mean_uar"}}, step=step)
+        sums, n, t0 = dict.fromkeys(sums, 0.0), 0, time.time()
         if val["mean_uar"] > best:
-            best, best_state, bad = val["mean_uar"], model.trainable_state_dict(), 0
+            best, best_step, best_state, bad = val["mean_uar"], step, model.trainable_state_dict(), 0
         else:
             bad += 1
-            if bad >= hp["patience"]:
-                log(f"early stop at epoch {epoch}")
-                break
+        if bad >= hp["patience"]:
+            log(f"early stop at step {step} (best step {best_step})")
+            break
+        if step >= hp["max_steps"]:
+            break
     model.load_state_dict(best_state, strict=False)
-    return {"best_val_mean_uar": best, "history": history}
+    return {"best_val_mean_uar": best, "best_step": best_step, "history": history}
 
 
 def main(argv=None):
@@ -122,7 +160,8 @@ def main(argv=None):
     ap.add_argument("--manifest-dir", default="data/manifests")
     ap.add_argument("--out", default="runs")
     ap.add_argument("--backbone", help="override the protocol's source-language backbone (e.g. tiny-random)")
-    ap.add_argument("--set", nargs="*", default=[], metavar="KEY=VALUE", help="override hparams, e.g. epochs=2")
+    ap.add_argument("--set", nargs="*", default=[], metavar="KEY=VALUE", help="override hparams, e.g. max_steps=200")
+    ap.add_argument("--tag", default="", help="suffix for the run directory / wandb name (e.g. an lr sweep point)")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--wandb", action="store_true", help="log to Weights & Biases (off by default)")
     ap.add_argument("--wandb-project", default="zero-shot-xling-ser")
@@ -141,9 +180,11 @@ def main(argv=None):
                 pass
         hp[k] = v
     seed_all(hp["seed"])
+    hp_sha = hashlib.sha256(json.dumps(hp, sort_keys=True).encode()).hexdigest()
 
     plan = build_plan(protocol, a.task, a.system, a.manifest_dir, backbone=a.backbone)
-    out = Path(a.out) / a.task / f"{a.system}_seed{hp['seed']}"
+    run_name = f"{a.system}_seed{hp['seed']}" + (f"_{a.tag}" if a.tag else "")
+    out = Path(a.out) / a.task / run_name
     out.mkdir(parents=True, exist_ok=True)
     logf = open(out / "train.log", "w")
 
@@ -160,10 +201,10 @@ def main(argv=None):
         import wandb
         tracker = wandb.init(
             project=a.wandb_project, entity=a.wandb_entity, group=a.task, job_type=a.system,
-            name=f"{a.task}_{a.system}_seed{hp['seed']}", dir=str(out),
-            tags=[a.task, a.system, "zero-shot" if plan.zero_shot else "upper-bound"],
-            config={"task": a.task, "system": a.system, "backbone": plan.backbone,
-                    "protocol_sha256": plan.protocol_sha256, "audit": audit, **hp})
+            name=f"{a.task}_{run_name}", dir=str(out),
+            tags=[a.task, a.system, "dev" if plan.dev else "zero-shot" if plan.zero_shot else "upper-bound"],
+            config={"task": a.task, "system": a.system, "backbone": plan.backbone, "tag": a.tag,
+                    "protocol_sha256": plan.protocol_sha256, "hparams_sha256": hp_sha, "audit": audit, **hp})
 
     model = SERModel(plan.backbone, len(plan.labels), len(plan.speakers) if plan.spkadv else 0,
                      hp["lora_rank"], hp["lora_alpha"], hp["adapter_dim"], hp["spk_hidden"],
@@ -183,8 +224,8 @@ def main(argv=None):
         yt, yp = predict(model, list(plan.target_all), plan, hp, a.device)
         result["target_all_supplementary"] = uar_f1(yt, yp, n)
 
-    summary = {"task": a.task, "system": a.system, "backbone": plan.backbone,
-               "protocol_sha256": plan.protocol_sha256, "hparams": hp, "audit": audit,
+    summary = {"task": a.task, "system": a.system, "backbone": plan.backbone, "tag": a.tag, "dev": plan.dev,
+               "protocol_sha256": plan.protocol_sha256, "hparams_sha256": hp_sha, "hparams": hp, "audit": audit,
                **train_info, **result}
     (out / "run.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False))
     if tracker is not None:
