@@ -22,6 +22,8 @@ DEV = ["EN-UR", "CN-UR", "DE-UR", "FR-UR"]
 ap = argparse.ArgumentParser()
 ap.add_argument("runs", nargs="?", default="runs")
 ap.add_argument("--dev", action="store_true")
+ap.add_argument("--all-target", action="store_true",
+                help="zero-shot rows: score on the whole target corpus (target_all_supplementary) instead of its test split")
 a = ap.parse_args()
 
 sha = hashlib.sha256(Path("configs/protocol.yaml").read_bytes()).hexdigest()
@@ -34,13 +36,19 @@ for f in sorted(Path(a.runs).glob("*/*/run.json")):
     if bool(r.get("dev")) != a.dev:
         continue
     key = (r["task"], r.get("tag", "") if a.dev else r["system"])
-    res[key].append((r["target_test"]["uar"], r["target_test"]["f1"], r["best_val_mean_uar"]))
+    m = r.get("target_all_supplementary") if a.all_target and not a.dev else None
+    m = m or r["target_test"]  # upper bound has no supplementary score: always its test split
+    res[key].append((m["uar"], m["f1"], r["best_val_mean_uar"]))
     hp = {k: v for k, v in r["hparams"].items() if k != "seed"}
     hps[hashlib.sha256(json.dumps(hp, sort_keys=True).encode()).hexdigest()].add(f"{r['task']}/{r['system']}")
 
 
 def cell(v):
-    return f"{np.mean([x[0] for x in v]):.2f} / {np.mean([x[1] for x in v]):.2f} (n={len(v)})" if v else "-"
+    if not v:
+        return "-"
+    u, f = np.array([x[0] for x in v]), np.array([x[1] for x in v])
+    sd = lambda x: f"±{x.std(ddof=1):.1f}" if len(x) > 1 else ""
+    return f"{u.mean():.2f}{sd(u)} / {f.mean():.2f}{sd(f)} (n={len(v)})"
 
 
 if a.dev:
@@ -55,6 +63,8 @@ if a.dev:
         print(f"| {tag} | " + " | ".join(cells) + f" | {np.mean(vals):.2f} |")
     print("\nChoose by mean val UAR; test columns are shown only as a sanity check.")
 else:
+    if a.all_target:
+        print("zero-shot columns: whole target corpus (supplementary); upper_bound: target test split")
     print("| Task | " + " | ".join(f"{s} UAR / F1" for s in SYSTEMS) + " |")
     print("|---" * (len(SYSTEMS) + 1) + "|")
     for t in TASKS:

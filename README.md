@@ -93,8 +93,9 @@ python -m xlser.prepare --lang EN --root /data/meld_wav
 
 # 2) 訓練 + 評估
 python -m xlser.train --task EN-DE --system proposed
-bash scripts/run_all.sh 0 1 2 3 4 5         # 9 tasks x 6 systems x 3 seeds，一張 GPU 一個 job
-python scripts/collect_results.py runs      # Table 2 格式
+bash scripts/run_all.sh 0 1 2 3 4 5         # 9 tasks x 6 systems x 5 seeds，一張 GPU 一個 job
+python scripts/collect_results.py runs      # Table 2 格式（mean±std over seeds）
+python scripts/collect_results.py runs --all-target   # zero-shot 以整個目標語料評估（補充）
 ```
 
 ### 在 GPU cluster 上跑
