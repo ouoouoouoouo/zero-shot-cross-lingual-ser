@@ -20,7 +20,7 @@ early stopping / 超參數選擇；超參數只能看 URDU dev。
 | split | 樣本 | 原因 | 狀態 | 來源 |
 |---|---|---|---|---|
 | train | dia125_utt3 | 原始發行版壞檔，FFmpeg 回報 `moov atom not found`，無法抽出音軌 | 已在本機確認 | https://github.com/declare-lab/MELD/issues/39 |
-| val (dev) | dia110_utt7 | 原始 dev 發行版缺檔，與 val 少 1 筆相符 | 待在伺服器上逐筆確認 | https://github.com/declare-lab/MELD/issues/22 |
+| val (dev) | dia110_utt7 | 原始 dev 發行版缺檔，與 val 少 1 筆相符 | 已在伺服器確認（prepare 列出的缺檔即此兩筆） | https://github.com/declare-lab/MELD/issues/22 |
 
 樣本數（4 類）：我們 train 8,244 / val 896 / test 2,211；論文 Table 1 為 8,245 / 897 / 2,211。
 
@@ -30,6 +30,7 @@ early stopping / 超參數選擇；超參數只能看 URDU dev。
 - 報告結果時註明實際樣本數，以及這兩筆已排除。
 
 轉檔：`bash scripts/meld_mp4_to_wav.sh <MELD.Raw> <meld_wav> [jobs]`（16 kHz mono，失敗清單在 `<meld_wav>/failed.txt`）。
+伺服器路徑：`~/dataset/MELD/meld_wav`。manifest `data/manifests/EN.csv` 11,351 筆，split sha256 `8105357fb4f2…`。
 
 ### EMO-DB（DE）
 
@@ -51,6 +52,10 @@ CaFE 資料夾。CAMEO 把原始檔名換成 hash（`file_id`），speaker 與�
 - 轉檔：`python scripts/cameo_to_wav.py <cafe parquet> <out>` → 16 kHz mono wav +
   `<out>/cameo_metadata.csv`；`xlser/corpora/cafe.py` 偵測到這份 CSV 就改讀它。
 - 4 類（anger / happiness / sadness / neutral）預期 504 句，分層切成 420 / 42 / 42。
+- 已在伺服器確認：936 句、7 種情緒（anger / disgust / fear / happiness / sadness / surprise 各 144，
+  neutral 72）、12 位 speaker 各 78 句；CAMEO 版已是 16 kHz（原始 CaFE 為 48 kHz）。
+  輸出在 `~/dataset/CaFE_cameo`，manifest `data/manifests/FR.csv` 504 筆、420 / 42 / 42，
+  split sha256 `07655c53309b…`。
 - CAMEO 其他語料（CREMA-D、RAVDESS…）不屬於論文的五個資料集，不使用。
 
 ### 尚未準備
