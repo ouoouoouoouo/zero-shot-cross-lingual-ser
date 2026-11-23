@@ -84,7 +84,8 @@ def build_manifest(lang, root, protocol, allow_count_mismatch=False):
         r.update(corpus=spec["corpus"], lang=lang)
 
     counts = {s: sum(r["split"] == s for r in rows) for s in ("train", "val", "test")}
-    msg = f"[{lang}/{spec['corpus']}] {counts} (paper: {spec['expected']}, minus known_missing: {exp})"
+    msg = f"[{lang}/{spec['corpus']}] {counts} (paper: {spec['expected']}"
+    msg += f", minus known_missing: {exp})" if exp != spec["expected"] else ")"
     if counts != exp:
         if not allow_count_mismatch:
             raise SystemExit(msg + "\ncounts differ from the paper; fix the corpus copy "

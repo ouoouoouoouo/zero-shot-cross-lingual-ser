@@ -7,3 +7,4 @@ scikit-learn
 pyyaml
 pytest
 wandb  # optional, only needed with --wandb
+pyarrow  # optional, only for scripts/cameo_to_wav.py

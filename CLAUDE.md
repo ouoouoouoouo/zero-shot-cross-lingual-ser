@@ -42,6 +42,23 @@ EN→DE 98.48、CN→DE 94.99、FR→DE 92.82 UAR；論文 97.22 / 97.22 / 95.44
 300 / 20 / 80，與論文一致。UR 從來不是 target，是唯一允許調超參數的 dev 語料
 （lr sweep 選出 1e-3，已凍結於 `configs/train.yaml`）。
 
+### CaFE（FR）
+
+來源是 CAMEO（`~/dataset/CAMEO/CAMEO/data/cafe-00000-of-00001.parquet`，936 句完整版），不是原始
+CaFE 資料夾。CAMEO 把原始檔名換成 hash（`file_id`），speaker 與情緒改從 `speaker_id`
+（`cafe_01`…`cafe_12`）和 `emotion` 欄位取得，強度（Faible / Fort）資訊不在。
+
+- 轉檔：`python scripts/cameo_to_wav.py <cafe parquet> <out>` → 16 kHz mono wav +
+  `<out>/cameo_metadata.csv`；`xlser/corpora/cafe.py` 偵測到這份 CSV 就改讀它。
+- 4 類（anger / happiness / sadness / neutral）預期 504 句，分層切成 420 / 42 / 42。
+- CAMEO 其他語料（CREMA-D、RAVDESS…）不屬於論文的五個資料集，不使用。
+
 ### 尚未準備
 
-CaFE（FR）、ESD（CN，只用 Mandarin 0001–0010）。
+ESD（CN，只用 Mandarin 0001–0010）。
+
+### protocol hash
+
+`configs/protocol.yaml` 任何修改都會改變 `protocol_sha256`，`collect_results.py` 會略過舊 hash 的 run。
+2026-11 為 MELD 加入 `known_missing` 後，先前的 EMO-DB Upper Bound 與 URDU dev runs 已屬舊 hash
+（數字仍記錄在上方與 `configs/train.yaml` 註解）；正式 Table 2 由 `run_all.sh` 全部重跑。

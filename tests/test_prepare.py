@@ -74,3 +74,17 @@ def test_meld_unexpected_missing_is_rejected(tmp_path, protocol):
     _fake_meld(tmp_path, {"train/dia0_utt0", "dev/dia0_utt0", "test/dia0_utt0"})
     with pytest.raises(SystemExit, match="known_missing"):
         build_manifest("EN", tmp_path, _meld_protocol(protocol))
+
+
+def test_cafe_cameo_metadata(tmp_path):
+    import csv as _csv
+    with open(tmp_path / "cameo_metadata.csv", "w", newline="") as f:
+        w = _csv.writer(f)
+        w.writerow(["utt_id", "speaker", "emotion", "transcription", "path"])
+        for uid, spk, emo in [("a1", "cafe_01", "anger"), ("b2", "cafe_12", "happiness"),
+                              ("c3", "cafe_03", "sadness"), ("d4", "cafe_04", "neutral"), ("e5", "cafe_05", "fear")]:
+            w.writerow([uid, spk, emo, "x", f"{emo}/{uid}.wav"])
+    rows = {r["utt_id"]: r for r in cafe.scan(tmp_path)}
+    assert {k: (v["speaker"], v["label"]) for k, v in rows.items()} == {
+        "a1": ("01", "angry"), "b2": ("12", "happy"), "c3": ("03", "sad"), "d4": ("04", "neutral")}
+    assert rows["a1"]["path"].endswith("anger/a1.wav")
