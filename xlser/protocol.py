@@ -162,6 +162,9 @@ def check_isolation(plan, protocol):
     t = protocol["tasks"].get(plan.task, {})
     if plan.zero_shot and len(plan.train_langs) == len(protocol["corpora"]) - 1:
         got = (len(plan.train), len(plan.speakers))
-        exp = (t["expected_train"], t["expected_speakers"])
+        n_missing = sum(u.startswith("train/") for l in plan.train_langs
+                        for u in protocol["corpora"][l].get("known_missing", []))
+        exp = (t["expected_train"] - n_missing, t["expected_speakers"])
         if got != exp:
-            print(f"WARNING {plan.task}: #samples/#spk = {got}, paper Table 1 = {exp}", file=sys.stderr)
+            print(f"WARNING {plan.task}: #samples/#spk = {got}, paper Table 1 minus known_missing = {exp}",
+                  file=sys.stderr)

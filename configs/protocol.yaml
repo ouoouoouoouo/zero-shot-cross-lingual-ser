@@ -10,7 +10,9 @@ split_seed: 20260604                      # seed for every non-official split
 #   official   : use the corpus' own partition (MELD)
 #   stratified : fixed-seed stratified random split with exact counts
 corpora:
-  EN: {corpus: meld,  split: official,   expected: {train: 8245,  val: 897,  test: 2211}}
+  EN: {corpus: meld,  split: official,   expected: {train: 8245,  val: 897,  test: 2211},
+       # in the CSVs but with no usable video in MELD.Raw; excluded (paper counts include them)
+       known_missing: [train/dia125_utt3, dev/dia110_utt7]}
   CN: {corpus: esd,   split: stratified, strata: [speaker, label], expected: {train: 11200, val: 1400, test: 1400}}
   DE: {corpus: emodb, split: stratified, strata: [label],          expected: {train: 266,   val: 35,   test: 38}}
   FR: {corpus: cafe,  split: stratified, strata: [label],          expected: {train: 420,   val: 42,   test: 42}}

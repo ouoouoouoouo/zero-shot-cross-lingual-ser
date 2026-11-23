@@ -35,3 +35,42 @@ def test_cafe_scanner(tmp_path):
     (tmp_path / "Joie/Fort/12-J-2-06.wav").touch()
     (tmp_path / "Joie/Fort/12-P-2-06.wav").touch()
     assert sorted((r["speaker"], r["label"]) for r in cafe.scan(tmp_path)) == [("01", "neutral"), ("12", "happy")]
+
+
+def _fake_meld(root, have_audio):
+    import csv as _csv
+    rows = {"train": [(0, 0, "joy"), (125, 3, "neutral"), (1, 0, "anger")],
+            "dev": [(110, 7, "sadness"), (0, 0, "neutral")],
+            "test": [(0, 0, "joy")]}
+    for split, utts in rows.items():
+        (root / split).mkdir(parents=True)
+        with open(root / f"{split}_sent_emo.csv", "w", newline="") as f:
+            w = _csv.writer(f)
+            w.writerow(["Sr No.", "Utterance", "Speaker", "Emotion", "Sentiment", "Dialogue_ID", "Utterance_ID"])
+            for d, u, e in utts:
+                w.writerow([0, "x", "Ross", e, "x", d, u])
+                if f"{split}/dia{d}_utt{u}" in have_audio:
+                    (root / split / f"dia{d}_utt{u}.wav").write_bytes(b"RIFF")
+
+
+def _meld_protocol(protocol):
+    protocol["corpora"]["EN"]["expected"] = {"train": 3, "val": 2, "test": 1}
+    return protocol
+
+
+def test_meld_known_missing_accepted_and_counted(tmp_path, protocol):
+    import pytest
+    from xlser.prepare import build_manifest
+    _fake_meld(tmp_path, {"train/dia0_utt0", "train/dia1_utt0", "dev/dia0_utt0", "test/dia0_utt0"})
+    rows = build_manifest("EN", tmp_path, _meld_protocol(protocol))
+    assert sorted(r["utt_id"] for r in rows) == ["dev/dia0_utt0", "test/dia0_utt0", "train/dia0_utt0", "train/dia1_utt0"]
+    assert all(r["path"] for r in rows)
+
+
+def test_meld_unexpected_missing_is_rejected(tmp_path, protocol):
+    import pytest
+    from xlser.prepare import build_manifest
+    # dia1_utt0 also missing -> not in known_missing -> hard error
+    _fake_meld(tmp_path, {"train/dia0_utt0", "dev/dia0_utt0", "test/dia0_utt0"})
+    with pytest.raises(SystemExit, match="known_missing"):
+        build_manifest("EN", tmp_path, _meld_protocol(protocol))

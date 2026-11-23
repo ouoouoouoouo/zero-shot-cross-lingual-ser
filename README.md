@@ -48,7 +48,7 @@ FR: `facebook/wav2vec2-base-fr-voxpopuli`）。Upper Bound 也用該 task 的來
 
 | 語言 | 語料 | train / val / test（4 類） | 方式 |
 |---|---|---|---|
-| EN | MELD | 8245 / 897 / 2211 | 官方切分 |
+| EN | MELD | 8244 / 896 / 2211 | 官方切分；論文 8245 / 897 含兩句沒有影片的 utterance（`known_missing`：train/dia125_utt3、dev/dia110_utt7），我們排除 |
 | CN | ESD（Mandarin 0001–0010） | 11200 / 1400 / 1400 | 依 (speaker, 情緒) 分層 |
 | DE | EMO-DB | 266 / 35 / 38 | 依情緒分層 |
 | FR | CaFE | 420 / 42 / 42 | 依情緒分層 |

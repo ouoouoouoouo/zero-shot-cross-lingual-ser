@@ -53,7 +53,25 @@ def build_manifest(lang, root, protocol, allow_count_mismatch=False):
     rows = SCANNERS[spec["corpus"]](root)
     if not rows:
         raise SystemExit(f"no 4-class utterances found under {root} for {spec['corpus']}")
-    exp = spec["expected"]
+    exp = dict(spec["expected"])
+
+    # utterances listed by the corpus but without usable audio: only the ones the
+    # protocol names in `known_missing` are accepted, and they lower the expected counts
+    missing = sorted(r["utt_id"] for r in rows if r.get("missing"))
+    rows = [r for r in rows if not r.get("missing")]
+    known = sorted(spec.get("known_missing", []))
+    if missing:
+        print(f"[{lang}/{spec['corpus']}] no audio for {len(missing)} utterance(s): {missing}")
+    if missing != known:
+        msg = (f"missing audio {missing} != known_missing {known} in configs/protocol.yaml; "
+               "re-extract those files, or report the list")
+        if not allow_count_mismatch:
+            raise SystemExit(msg)
+        print("WARNING " + msg, file=sys.stderr)
+    else:
+        split_of = {"train": "train", "dev": "val", "test": "test"}
+        for u in known:
+            exp[split_of[u.split("/")[0]]] -= 1
     if spec["split"] == "official":
         for r in rows:
             r["split"] = r["official_split"]
@@ -66,7 +84,7 @@ def build_manifest(lang, root, protocol, allow_count_mismatch=False):
         r.update(corpus=spec["corpus"], lang=lang)
 
     counts = {s: sum(r["split"] == s for r in rows) for s in ("train", "val", "test")}
-    msg = f"[{lang}/{spec['corpus']}] {counts} (paper: {exp})"
+    msg = f"[{lang}/{spec['corpus']}] {counts} (paper: {spec['expected']}, minus known_missing: {exp})"
     if counts != exp:
         if not allow_count_mismatch:
             raise SystemExit(msg + "\ncounts differ from the paper; fix the corpus copy "
