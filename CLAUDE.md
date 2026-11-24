@@ -77,3 +77,9 @@ Baseline 1（EN→DE、EN→FR）10 個 run 中 6 個的 **MELD val UAR = 25.0�
 - 對策候選：`class_weighted_ce`（`configs/train.yaml`，訓練列的反類別頻率，只作用於隨機 batch 的系統）。
 - 驗證：`bash scripts/check_meld_training.sh 0 1 2 3`（dev task `EN-EN`：只在 MELD 上訓練 / 選模型 / 評估）。
 - 決策規則：依 EN-EN 的 MELD **val** UAR 決定是否開啟，開或不開都套用到所有系統，之後凍結並全部重跑。
+- 結果（2026-11-24，5 seeds）：MELD val UAR cw_false 38.6、cw_true 35.5 → **不採用**，`class_weighted_ce: false`。
+- 下一個假設：lr 1e-3（在小而平衡的 URDU 上選出）對 MELD 太大。`bash scripts/tune_lr_on_meld.sh 0 1 2 3`
+  在 EN-EN 補跑 lr 1e-4 / 3e-4 / 3e-3（1e-3 即 cw_false）。
+- **lr 重新選擇規則（看結果前固定）**：score(lr) = (EN/CN/DE/FR-UR 的 val UAR 平均 + EN-EN 的 val UAR) / 2，
+  兩個 dev 語料各佔一半，取最高者寫入 `configs/train.yaml` 並凍結；不看任何 DE / FR / CN 結果。
+  `python scripts/collect_results.py runs_dev --dev --lr-score` 直接算出分數。

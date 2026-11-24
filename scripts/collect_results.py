@@ -21,6 +21,9 @@ TASKS = ["EN-DE", "CN-DE", "FR-DE", "EN-FR", "CN-FR", "DE-FR", "EN-CN", "DE-CN",
 ap = argparse.ArgumentParser()
 ap.add_argument("runs", nargs="?", default="runs")
 ap.add_argument("--dev", action="store_true")
+ap.add_argument("--lr-score", action="store_true",
+                help="dev only: print the pre-registered lr selection score "
+                     "(mean URDU val + MELD val) / 2, treating EN-EN tag cw_false as lr1e-3")
 ap.add_argument("--all-target", action="store_true",
                 help="zero-shot rows: score on the whole target corpus (target_all_supplementary) instead of its test split")
 a = ap.parse_args()
@@ -66,7 +69,19 @@ if a.dev:
         cells = [f"{np.mean([x[2] for x in res[(t, tag)]]):.1f} ; {cell(res[(t, tag)])}" if res.get((t, tag)) else "-"
                  for t in DEV]
         print(f"| {tag} | " + " | ".join(cells) + f" | {np.mean(vals):.2f} |")
-    print("\nChoose by mean val UAR; test columns are shown only as a sanity check.")
+    if a.lr_score:
+        def val(task, tag):
+            v = res.get((task, tag))
+            return np.mean([x[2] for x in v]) if v else None
+        print("\nlr selection score = (mean val over EN/CN/DE/FR-UR + EN-EN val) / 2")
+        for lr in ["1e-4", "3e-4", "1e-3", "3e-3"]:
+            ur = [val(t, f"lr{lr}") for t in ("EN-UR", "CN-UR", "DE-UR", "FR-UR")]
+            en = val("EN-EN", "cw_false" if lr == "1e-3" else f"lr{lr}")
+            if None in ur or en is None:
+                print(f"  lr {lr}: incomplete (UR {ur}, EN {en})")
+                continue
+            print(f"  lr {lr}: UR {np.mean(ur):.2f}  EN {en:.2f}  ->  score {(np.mean(ur) + en) / 2:.2f}")
+    print("\nChoose by val UAR only; test columns are shown only as a sanity check.")
 else:
     if a.all_target:
         print("zero-shot columns: whole target corpus (supplementary); upper_bound: target test split")
