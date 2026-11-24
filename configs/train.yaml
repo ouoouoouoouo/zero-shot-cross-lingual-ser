@@ -18,6 +18,8 @@ lora_alpha: 16
 adapter_dim: 64
 lr: 1.0e-3                # selected on URDU dev (mean val UAR: 1e-4 92.50, 3e-4 93.75, 1e-3 96.25, 3e-3 93.75)
 weight_decay: 0.01
+class_weighted_ce: false   # weight emotion CE by inverse class frequency of the training rows
+                         # (random-batch systems only; hierarchical batches are already class-balanced)
 max_steps: 3000          # optimizer-step budget, identical for every system
 warmup_steps: 100        # linear warm-up, then cosine decay to 0 at max_steps
 eval_every: 100          # score the val split every N steps

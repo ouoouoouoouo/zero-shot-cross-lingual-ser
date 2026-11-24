@@ -17,7 +17,6 @@ import numpy as np
 
 SYSTEMS = ["baseline1", "baseline2", "proposed", "proposed_no_spk", "proposed_no_supcon", "upper_bound"]
 TASKS = ["EN-DE", "CN-DE", "FR-DE", "EN-FR", "CN-FR", "DE-FR", "EN-CN", "DE-CN", "FR-CN"]
-DEV = ["EN-UR", "CN-UR", "DE-UR", "FR-UR"]
 
 ap = argparse.ArgumentParser()
 ap.add_argument("runs", nargs="?", default="runs")
@@ -26,11 +25,16 @@ ap.add_argument("--all-target", action="store_true",
                 help="zero-shot rows: score on the whole target corpus (target_all_supplementary) instead of its test split")
 a = ap.parse_args()
 
-sha = hashlib.sha256(Path("configs/protocol.yaml").read_bytes()).hexdigest()
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from xlser.protocol import load_protocol  # noqa: E402
+
+protocol = load_protocol("configs/protocol.yaml")
+sha = protocol["_sha256"]
+DEV = list(protocol["dev_tasks"])
 res, hps = defaultdict(list), defaultdict(set)
 for f in sorted(Path(a.runs).glob("*/*/run.json")):
     r = json.loads(f.read_text())
-    if r["protocol_sha256"] != sha:
+    if r["protocol_sha256"] != sha and not r.get("dev"):
         print(f"skip {f}: different protocol", file=sys.stderr)
         continue
     if bool(r.get("dev")) != a.dev:
@@ -53,7 +57,8 @@ def cell(v):
 
 if a.dev:
     tags = sorted({t for _, t in res})
-    print("URDU dev: each cell = val UAR (used to choose) ; test UAR / F1")
+    print("dev tasks: each cell = val UAR (used to choose) ; test UAR / F1")
+    DEV = [t for t in DEV if any(k[0] == t for k in res)]
     print("| tag | " + " | ".join(DEV) + " | mean val UAR |")
     print("|---" * (len(DEV) + 2) + "|")
     for tag in tags:

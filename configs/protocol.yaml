@@ -40,10 +40,11 @@ tasks:
 
 # Hyper-parameter selection (configs/train.yaml: lr, warm-up, step budget, ...)
 # may look ONLY at these dev tasks: the upper_bound system trained and scored on
-# URDU with each source backbone. UR is never the target of the nine tasks, so
-# no DE / FR / CN number can influence the hyper-parameters. Dev runs never go
-# into Table 2.
+# a language that is never the target of the nine tasks (UR, and EN for checks
+# of training on MELD itself), so no DE / FR / CN number can influence
+# train.yaml. Dev runs never go into Table 2 and are excluded from protocol_sha256.
 dev_tasks:
+  EN-EN: {source: EN, target: EN}
   EN-UR: {source: EN, target: UR}
   CN-UR: {source: CN, target: UR}
   DE-UR: {source: DE, target: UR}

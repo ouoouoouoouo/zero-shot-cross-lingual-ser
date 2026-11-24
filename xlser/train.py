@@ -71,6 +71,13 @@ def predict(model, rows, plan, hp, device, batch_size=None):
     return y_true, y_pred
 
 
+def class_weights(rows, labels, device):
+    """Inverse class frequency of the TRAINING rows, normalised to mean 1."""
+    counts = torch.tensor([sum(r["label"] == l for r in rows) for l in labels], dtype=torch.float)
+    w = counts.sum() / (len(labels) * counts.clamp_min(1))
+    return (w / w.mean()).to(device)
+
+
 def lr_lambda(hp):
     """Linear warm-up, then cosine decay to 0 at max_steps."""
     warm, total = hp["warmup_steps"], hp["max_steps"]
@@ -109,6 +116,10 @@ def fit(model, plan, hp, device, log, tracker=None):
     dl = DataLoader(ds, batch_sampler=sampler, collate_fn=collate, num_workers=hp["num_workers"],
                     persistent_workers=hp["num_workers"] > 0, worker_init_fn=ds.init_worker)
     lang_id = {l: i for i, l in enumerate(plan.train_langs)}
+    ce_weight = class_weights(train_rows, plan.labels, device) \
+        if hp.get("class_weighted_ce") and plan.sampler != "hierarchical" else None
+    if ce_weight is not None:
+        log(f"class-weighted CE: {dict(zip(plan.labels, [round(w, 3) for w in ce_weight.tolist()]))}")
 
     params = [p for p in model.parameters() if p.requires_grad]
     opt = torch.optim.AdamW(params, lr=hp["lr"], weight_decay=hp["weight_decay"])
@@ -121,7 +132,7 @@ def fit(model, plan, hp, device, log, tracker=None):
     for step, b in enumerate(batches(dl, sampler), start=1):
         out = model(b["wav"].to(device), b["lengths"].to(device))
         y = b["label"].to(device)
-        terms = {"ce": F.cross_entropy(out["emotion"], y)}
+        terms = {"ce": F.cross_entropy(out["emotion"], y, weight=ce_weight)}
         loss = terms["ce"]
         if plan.supcon:
             langs = torch.tensor([lang_id[l] for l in b["lang"]], device=device)

@@ -54,3 +54,10 @@ def test_hparams_hash_ignores_seed_only():
     from xlser.train import hparams_sha256
     assert hparams_sha256({"lr": 1e-3, "seed": 0}) == hparams_sha256({"lr": 1e-3, "seed": 2})
     assert hparams_sha256({"lr": 1e-3, "seed": 0}) != hparams_sha256({"lr": 3e-3, "seed": 0})
+
+
+def test_class_weights_inverse_frequency():
+    from xlser.train import class_weights
+    rows = [{"label": "neutral"}] * 6 + [{"label": "happy"}] * 2 + [{"label": "angry"}] * 2 + [{"label": "sad"}] * 2
+    w = class_weights(rows, ("neutral", "happy", "angry", "sad"), "cpu")
+    assert abs(w.mean().item() - 1) < 1e-6 and abs(w[1].item() / w[0].item() - 3) < 1e-6

@@ -64,6 +64,16 @@ ESD（CN，只用 Mandarin 0001–0010）。
 
 ### protocol hash
 
-`configs/protocol.yaml` 任何修改都會改變 `protocol_sha256`，`collect_results.py` 會略過舊 hash 的 run。
-2026-11 為 MELD 加入 `known_missing` 後，先前的 EMO-DB Upper Bound 與 URDU dev runs 已屬舊 hash
-（數字仍記錄在上方與 `configs/train.yaml` 註解）；正式 Table 2 由 `run_all.sh` 全部重跑。
+`protocol_sha256` 由 `configs/protocol.yaml` 的內容計算（不含註解與 `dev_tasks`），`collect_results.py`
+會略過 hash 不同的 run。2026-11-24 改為此算法前的所有 run（含 35 個 *→FR Upper Bound / Baseline 1）
+都屬舊 hash；正式 Table 2 由 `run_all.sh` 全部重跑。
+
+## 已知問題：只用 MELD 訓練會崩成全猜 neutral（2026-11-24）
+
+Baseline 1（EN→DE、EN→FR）10 個 run 中 6 個的 **MELD val UAR = 25.0、best_step = 100**：在來源端就只會
+猜 neutral（MELD 4 類 neutral 佔 57%，baseline 用一般隨機 batch）。DE / FR 來源的 baseline 正常
+（source val 87–100）。判斷依據只用來源端 MELD val，不看 DE / FR 結果。
+
+- 對策候選：`class_weighted_ce`（`configs/train.yaml`，訓練列的反類別頻率，只作用於隨機 batch 的系統）。
+- 驗證：`bash scripts/check_meld_training.sh 0 1 2 3`（dev task `EN-EN`：只在 MELD 上訓練 / 選模型 / 評估）。
+- 決策規則：依 EN-EN 的 MELD **val** UAR 決定是否開啟，開或不開都套用到所有系統，之後凍結並全部重跑。

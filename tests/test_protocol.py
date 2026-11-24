@@ -73,12 +73,23 @@ def test_hierarchical_sampler_on_plan(protocol, manifests):
                 assert sum(r["lang"] == lang and r["label"] == label for r in rows) == 3
 
 
-def test_dev_tasks_only_touch_urdu(protocol, manifests):
-    for task in protocol["dev_tasks"]:
+def test_dev_tasks_never_touch_a_table2_target(protocol, manifests):
+    table2_targets = {t["target"] for t in protocol["tasks"].values()}
+    for task, t in protocol["dev_tasks"].items():
         p = build_plan(protocol, task, "upper_bound", manifests)
-        assert p.dev and {r["lang"] for r in p.train + p.val + p.test} == {"UR"}
-        assert p.backbone == protocol["backbones"][task.split("-")[0]]
-    assert all(t["target"] != "UR" for t in protocol["tasks"].values())
+        assert t["target"] not in table2_targets
+        assert p.dev and {r["lang"] for r in p.train + p.val + p.test} == {t["target"]}
+        assert p.backbone == protocol["backbones"][t["source"]]
+
+
+def test_protocol_hash_ignores_dev_tasks_only(protocol):
+    from xlser.protocol import protocol_sha256
+    import copy
+    q = copy.deepcopy(protocol)
+    q["dev_tasks"]["XX-UR"] = {"source": "EN", "target": "UR"}
+    assert protocol_sha256(q) == protocol["_sha256"]
+    q["tasks"]["EN-DE"]["source"] = "CN"
+    assert protocol_sha256(q) != protocol["_sha256"]
 
 
 def test_dev_tasks_reject_zero_shot_systems(protocol, manifests):

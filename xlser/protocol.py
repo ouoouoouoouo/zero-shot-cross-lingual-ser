@@ -9,6 +9,7 @@ trainer only ever builds its sampler, speaker map and early-stopping set from
 """
 import csv
 import hashlib
+import json
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -23,10 +24,17 @@ class LeakageError(RuntimeError):
     """Target-language data reached a stage it must not see."""
 
 
+def protocol_sha256(protocol):
+    """Fingerprint of everything that defines a Table 2 run. Content-based, so
+    comments / formatting do not matter, and `dev_tasks` (never in Table 2) is
+    excluded so adding a dev check does not invalidate finished runs."""
+    core = {k: v for k, v in protocol.items() if k != "dev_tasks" and not k.startswith("_")}
+    return hashlib.sha256(json.dumps(core, sort_keys=True).encode()).hexdigest()
+
+
 def load_protocol(path="configs/protocol.yaml"):
-    raw = Path(path).read_bytes()
-    protocol = yaml.safe_load(raw)
-    protocol["_sha256"] = hashlib.sha256(raw).hexdigest()
+    protocol = yaml.safe_load(Path(path).read_bytes())
+    protocol["_sha256"] = protocol_sha256(protocol)
     return protocol
 
 
