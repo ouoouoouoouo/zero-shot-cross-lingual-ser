@@ -23,7 +23,7 @@ ap.add_argument("runs", nargs="?", default="runs")
 ap.add_argument("--dev", action="store_true")
 ap.add_argument("--lr-score", action="store_true",
                 help="dev only: print the pre-registered lr selection score "
-                     "(mean URDU val + MELD val) / 2, treating EN-EN tag cw_false as lr1e-3")
+                     "(mean URDU val + MELD val) / 2")
 ap.add_argument("--all-target", action="store_true",
                 help="zero-shot rows: score on the whole target corpus (target_all_supplementary) instead of its test split")
 a = ap.parse_args()
@@ -76,7 +76,7 @@ if a.dev:
         print("\nlr selection score = (mean val over EN/CN/DE/FR-UR + EN-EN val) / 2")
         for lr in ["1e-4", "3e-4", "1e-3", "3e-3"]:
             ur = [val(t, f"lr{lr}") for t in ("EN-UR", "CN-UR", "DE-UR", "FR-UR")]
-            en = val("EN-EN", "cw_false" if lr == "1e-3" else f"lr{lr}")
+            en = val("EN-EN", f"lr{lr}")
             if None in ur or en is None:
                 print(f"  lr {lr}: incomplete (UR {ur}, EN {en})")
                 continue

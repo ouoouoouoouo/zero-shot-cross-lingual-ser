@@ -2,7 +2,7 @@
 # Hyper-parameter selection on the URDU dev tasks only (UR is never a target).
 #   bash scripts/tune_on_urdu.sh 0 1 2 3 4 5          # GPU ids
 # Sweeps lr for every source backbone x 2 seeds, then prints the dev table.
-# Pick ONE lr (best mean over backbones) and write it into configs/train.yaml.
+# The lr is chosen together with scripts/tune_lr_on_meld.sh (see CLAUDE.md).
 set -euo pipefail
 GPUS=${@:-0}
 [ -f data/manifests/UR.csv ] || { echo "data/manifests/UR.csv missing: python -m xlser.prepare --lang UR --root <dir>" >&2; exit 1; }

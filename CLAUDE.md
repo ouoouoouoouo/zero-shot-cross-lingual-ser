@@ -80,6 +80,11 @@ Baseline 1（EN→DE、EN→FR）10 個 run 中 6 個的 **MELD val UAR = 25.0�
 - 結果（2026-11-24，5 seeds）：MELD val UAR cw_false 38.6、cw_true 35.5 → **不採用**，`class_weighted_ce: false`。
 - 下一個假設：lr 1e-3（在小而平衡的 URDU 上選出）對 MELD 太大。`bash scripts/tune_lr_on_meld.sh 0 1 2 3`
   在 EN-EN 補跑 lr 1e-4 / 3e-4 / 3e-3（1e-3 即 cw_false）。
+- 診斷（EN-EN cw_false 訓練曲線）：所有 seed 前 300–600+ 步 ce ≈ 1.10–1.18（= MELD 類別先驗的熵 ≈ 1.12），
+  val 停在 25，之後多數爬到 40–43；s3 平台期超過 patience 8 × 100 = 800 步，被提前停止（best_step 100）。
+  Baseline 1 的 6 個崩潰 run 同一機制。→ **取消提前停止**：`patience: null`，固定跑 `max_steps`，取 val 最佳
+  checkpoint（仍由 val 做 model selection）。依據只來自 MELD 來源端曲線。
+- 因訓練規則改變，URDU 與 MELD 的 lr sweep 都在 `patience: null` 下重跑（舊 `runs_dev` 移到 `runs_dev_old`）。
 - **lr 重新選擇規則（看結果前固定）**：score(lr) = (EN/CN/DE/FR-UR 的 val UAR 平均 + EN-EN 的 val UAR) / 2，
   兩個 dev 語料各佔一半，取最高者寫入 `configs/train.yaml` 並凍結；不看任何 DE / FR / CN 結果。
   `python scripts/collect_results.py runs_dev --dev --lr-score` 直接算出分數。

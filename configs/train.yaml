@@ -23,8 +23,9 @@ class_weighted_ce: false   # weight emotion CE by inverse class frequency of the
 max_steps: 3000          # optimizer-step budget, identical for every system
 warmup_steps: 100        # linear warm-up, then cosine decay to 0 at max_steps
 eval_every: 100          # score the val split every N steps
-patience: 8              # early stop after N evaluations without val improvement
-                         # (val = mean per-language UAR of the training languages)
+patience: null           # no early termination: always train max_steps and keep the checkpoint
+                         # with the best val UAR (mean per-language UAR of the training languages).
+                         # patience 8 cut MELD runs during their 300-800+ step prior-only plateau.
 grad_clip: 5.0
 max_train_sec: 6.0       # random crop during training
 max_eval_sec: 15.0       # deterministic head crop for val / test

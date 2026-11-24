@@ -103,8 +103,9 @@ def fit(model, plan, hp, device, log, tracker=None):
 
     Budget is counted in optimizer steps (not epochs), so every system gets the
     same number of updates regardless of how much training data it has. The val
-    set is scored every `eval_every` steps; training stops after `patience`
-    evaluations without improvement or at `max_steps`."""
+    set is scored every `eval_every` steps and the best checkpoint is kept.
+    Training runs to `max_steps`, or stops after `patience` evaluations without
+    improvement when patience is set (null = never stop early)."""
     train_rows = list(plan.train)
     ds = SERDataset(train_rows, plan.labels, plan.speakers, hp["max_train_sec"], train=True, seed=hp["seed"])
     bs = hp["n_lang"] * hp["n_cls"] * hp["n_sam"]
@@ -172,7 +173,7 @@ def fit(model, plan, hp, device, log, tracker=None):
             best, best_step, best_state, bad = val["mean_uar"], step, model.trainable_state_dict(), 0
         else:
             bad += 1
-        if bad >= hp["patience"]:
+        if hp["patience"] and bad >= hp["patience"]:
             log(f"early stop at step {step} (best step {best_step})")
             break
         if step >= hp["max_steps"]:
