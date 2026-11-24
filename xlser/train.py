@@ -12,6 +12,7 @@ import csv
 import hashlib
 import json
 import math
+import os
 import random
 import subprocess
 import time
@@ -45,10 +46,17 @@ def git_commit():
         return ""
 
 
-def seed_all(seed):
+def seed_all(seed, deterministic=False):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
+    if deterministic:
+        # same seed -> same run on the same GPU type (otherwise e.g. MELD at lr 1e-3
+        # escaped or collapsed depending on nondeterministic kernels)
+        os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        torch.use_deterministic_algorithms(True, warn_only=True)
 
 
 @torch.no_grad()
@@ -211,7 +219,7 @@ def main(argv=None):
             except ValueError:
                 pass
         hp[k] = v
-    seed_all(hp["seed"])
+    seed_all(hp["seed"], hp.get("deterministic", False))
     hp_sha = hparams_sha256(hp)
 
     plan = build_plan(protocol, a.task, a.system, a.manifest_dir, backbone=a.backbone)

@@ -2,7 +2,7 @@
 
 復現 Mi, Ma & Toda, arXiv:2606.06200（zero-shot cross-lingual SER）。規則見 README.md 與
 `configs/protocol.yaml`（凍結）。目標語言絕不能進 training / sampler / normalization /
-early stopping / 超參數選擇；超參數只能看 URDU dev。
+early stopping / 超參數選擇；超參數只能看 dev task（URDU 的 *-UR 與 MELD 的 EN-EN；UR、EN 都不是 target）。
 
 ## 資料集
 
@@ -40,8 +40,8 @@ EN→DE 98.48、CN→DE 94.99、FR→DE 92.82 UAR；論文 97.22 / 97.22 / 95.44
 
 ### URDU（UR）
 
-300 / 20 / 80，與論文一致。UR 從來不是 target，是唯一允許調超參數的 dev 語料
-（lr sweep 選出 1e-3，已凍結於 `configs/train.yaml`）。
+300 / 20 / 80，與論文一致。UR 從來不是 target，是調超參數用的 dev 語料（另一個是 MELD 的 EN-EN）。
+最初只用 URDU 選出 lr 1e-3；之後改為 URDU + MELD 共同選擇，最終 lr = 3e-4（見下方「已知問題」）。
 
 ### CaFE（FR）
 
@@ -88,3 +88,15 @@ Baseline 1（EN→DE、EN→FR）10 個 run 中 6 個的 **MELD val UAR = 25.0�
 - **lr 重新選擇規則（看結果前固定）**：score(lr) = (EN/CN/DE/FR-UR 的 val UAR 平均 + EN-EN 的 val UAR) / 2，
   兩個 dev 語料各佔一半，取最高者寫入 `configs/train.yaml` 並凍結；不看任何 DE / FR / CN 結果。
   `python scripts/collect_results.py runs_dev --dev --lr-score` 直接算出分數。
+
+### 結論：lr 凍結為 3e-4（2026-11-25）
+
+patience null 下的分數：1e-4 66.13、**3e-4 68.62**、1e-3 61.88、3e-3 59.06 → 依事先規則選 3e-4。
+
+- 檢查過的異常：舊規則下 lr 1e-3 的 MELD 有 4/5 seed 爬到約 40，新規則下 5/5 停在 25。超參數只差 patience，
+  沒有 NaN。原因是 lr 1e-3 在 MELD 上會崩塌（grad norm → 0.35、pooled feature norm 5 → 2.8、CE 回到先驗熵），
+  能否先爬出平台取決於 GPU 非確定性：舊 s0 也在第 1300 步崩回 25。lr 3e-4 所有 seed 穩定學習（feature norm 5 → 7）。
+- 之後所有 run 開啟 `deterministic: true`（cuDNN deterministic + `torch.use_deterministic_algorithms(warn_only=True)`），
+  同 seed、同 GPU 型號應可重現。
+- `configs/train.yaml` 自此凍結：lr 3e-4、patience null、class_weighted_ce false、max_steps 3000。
+  先前所有 Table 2 類 run（*→DE / *→FR Upper Bound、Baseline 1）都要用此設定重跑。
