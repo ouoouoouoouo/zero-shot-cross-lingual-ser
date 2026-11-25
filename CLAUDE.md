@@ -34,9 +34,9 @@ early stopping / 超參數選擇；超參數只能看 dev task（URDU 的 *-UR �
 
 ### EMO-DB（DE）
 
-4 類共 339 句，固定 seed 分層切分為 266 / 35 / 38，與論文一致。Upper Bound（3 seeds）：
-EN→DE 98.48、CN→DE 94.99、FR→DE 92.82 UAR；論文 97.22 / 97.22 / 95.44。test 只有 38 句，
-同設定不同 seed 可差到約 10 分，正式實驗跑 5 個 seed。
+4 類共 339 句，固定 seed 分層切分為 266 / 35 / 38，與論文一致。test 只有 38 句，
+同設定不同 seed 可差到約 10 分，正式實驗跑 5 個 seed。（早期 lr 1e-3、3 seeds 的 Upper Bound
+98.48 / 94.99 / 92.82 屬未凍結設定，不是正式結果；正式數字見文末。）
 
 ### URDU（UR）
 
@@ -100,3 +100,20 @@ patience null 下的分數：1e-4 66.13、**3e-4 68.62**、1e-3 61.88、3e-3 59.
   同 seed、同 GPU 型號應可重現。
 - `configs/train.yaml` 自此凍結：lr 3e-4、patience null、class_weighted_ce false、max_steps 3000。
   先前所有 Table 2 類 run（*→DE / *→FR Upper Bound、Baseline 1）都要用此設定重跑。
+
+## 正式結果：凍結設定、尚無 CN（2026-11-25，5 seeds，UAR mean ± std）
+
+lr 3e-4、patience null、class_weighted_ce false、deterministic true。
+
+| | Upper Bound | 論文 | Baseline 1 | 論文 |
+|---|---|---|---|---|
+| EN→DE | 91.22 ± 6.5 | 97.22 | 34.20 ± 5.0 | 52.23 |
+| CN→DE | 83.94 ± 13.7 | 97.22 | – | 85.42 |
+| FR→DE | 92.32 ± 1.6 | 95.44 | 60.45 ± 2.4 | 73.91 |
+| EN→FR | 87.50 ± 7.4 | 87.50 | 43.75 ± 4.9 | 45.83 |
+| CN→FR | 90.00 ± 3.4 | 89.58 | – | 72.92 |
+| DE→FR | 80.00 ± 7.9 | 81.25 | 53.33 ± 7.6 | 47.92 |
+
+- *→FR 大致與論文一致；目標為 DE 的格子普遍偏低（FR→DE Baseline 1 比 lr 1e-3 時的 74 低 14 分）。
+- **不可據此修改任何設定**：這些都是目標語言（DE / FR）的數字，Upper Bound 的 val / test 也是目標語言。
+  lr 依事先規則只由 URDU + MELD 決定。與論文的差距只寫進討論（小語料對 lr / seed 敏感、論文未公開 lr）。
