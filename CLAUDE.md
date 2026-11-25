@@ -116,6 +116,8 @@ patience null 下的分數：1e-4 66.13、**3e-4 68.62**、1e-3 61.88、3e-3 59.
   警告（wav2vec 2.0 attention 走 SDPA）。已改為 deterministic 時關閉 flash / mem-efficient / cuDNN SDPA，
   只用 math kernel。上方「正式結果」那 50 個 run 是此修正前跑的（數值有效，但不可逐位元重現）；
   最終 Table 2 由 `run_all.sh` 在修正後的程式碼上全部重跑。
+- 已在 GPU（RTX 4090）驗證：DE-FR baseline1 seed 0、300 步跑兩次，每次評估的 ce / grad norm 完全相同，
+  且無 non-deterministic 警告（2026-11-25，commit c674e70 之後）。
 - `configs/train.yaml` 自此凍結：lr 3e-4、patience null、class_weighted_ce false、max_steps 3000。
   先前所有 Table 2 類 run（*→DE / *→FR Upper Bound、Baseline 1）都要用此設定重跑。
 
