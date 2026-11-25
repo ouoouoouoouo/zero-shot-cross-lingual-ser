@@ -58,9 +58,23 @@ CaFE 資料夾。CAMEO 把原始檔名換成 hash（`file_id`），speaker 與�
   split sha256 `07655c53309b…`。
 - CAMEO 其他語料（CREMA-D、RAVDESS…）不屬於論文的五個資料集，不使用。
 
-### 尚未準備
+### ESD（CN）
 
-ESD（CN，只用 Mandarin 0001–0010）。
+伺服器路徑 `~/dataset/ESD/Emotion Speech Dataset`（底下直接是 0001–0020；`__MACOSX` 已刪除）。
+只用 Mandarin 0001–0010，每人 Neutral / Happy / Angry / Sad 各 350 句，Surprise 不用；
+不採用 ESD 自帶的 train / evaluation / test，依 (speaker, 情緒) 分層切成 280 / 35 / 35，
+合計 11200 / 1400 / 1400。
+
+## Table 1 #Spk 偏差（2026-11-25）
+
+EN→DE 的訓練集：`n_train` 20,164（= 論文 20,165 − MELD 缺檔 1 句）✅；`n_speakers` **298，論文 288**。
+
+- 各語言 train split 的 speaker 數：EN（MELD）249、CN 10、FR 12、UR 27。
+- 由論文三組 task 的 #Spk 可推得「MELD + URDU = 266」，我們是 249 + 27 = 276。
+  若論文的 URDU 算整個語料的 38 位，MELD 需為 228；若只算 train 的 27 位，MELD 需為 239。兩者都找不到可依據的規則。
+- MELD speaker 名稱統一大小寫 / 空白後仍為 249；其中 101 位在 train 只出現 1–2 次，另有 `All`（多人同時說話）。
+- **決定：照實保留，不為湊數字自訂過濾規則。** speaker 數只影響 speaker 對抗分類器的類別數，
+  不影響情緒標籤、切分與 `n_train`。報告中註明 #Spk 與論文不同及原因不明。
 
 ### protocol hash
 
