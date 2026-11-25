@@ -57,6 +57,13 @@ def seed_all(seed, deterministic=False):
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
         torch.use_deterministic_algorithms(True, warn_only=True)
+        # wav2vec 2.0 attention goes through SDPA; the flash / memory-efficient / cuDNN
+        # kernels have nondeterministic backward passes, the math kernel does not
+        for backend in ("flash", "mem_efficient", "cudnn"):
+            fn = getattr(torch.backends.cuda, f"enable_{backend}_sdp", None)
+            if fn is not None:
+                fn(False)
+        torch.backends.cuda.enable_math_sdp(True)
 
 
 @torch.no_grad()

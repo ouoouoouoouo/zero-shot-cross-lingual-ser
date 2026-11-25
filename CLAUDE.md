@@ -98,6 +98,10 @@ patience null 下的分數：1e-4 66.13、**3e-4 68.62**、1e-3 61.88、3e-3 59.
   能否先爬出平台取決於 GPU 非確定性：舊 s0 也在第 1300 步崩回 25。lr 3e-4 所有 seed 穩定學習（feature norm 5 → 7）。
 - 之後所有 run 開啟 `deterministic: true`（cuDNN deterministic + `torch.use_deterministic_algorithms(warn_only=True)`），
   同 seed、同 GPU 型號應可重現。
+- 2026-11-25：GPU log 顯示 50 個 run 都有 `Memory Efficient attention defaults to a non-deterministic algorithm`
+  警告（wav2vec 2.0 attention 走 SDPA）。已改為 deterministic 時關閉 flash / mem-efficient / cuDNN SDPA，
+  只用 math kernel。上方「正式結果」那 50 個 run 是此修正前跑的（數值有效，但不可逐位元重現）；
+  最終 Table 2 由 `run_all.sh` 在修正後的程式碼上全部重跑。
 - `configs/train.yaml` 自此凍結：lr 3e-4、patience null、class_weighted_ce false、max_steps 3000。
   先前所有 Table 2 類 run（*→DE / *→FR Upper Bound、Baseline 1）都要用此設定重跑。
 

@@ -61,3 +61,13 @@ def test_class_weights_inverse_frequency():
     rows = [{"label": "neutral"}] * 6 + [{"label": "happy"}] * 2 + [{"label": "angry"}] * 2 + [{"label": "sad"}] * 2
     w = class_weights(rows, ("neutral", "happy", "angry", "sad"), "cpu")
     assert abs(w.mean().item() - 1) < 1e-6 and abs(w[1].item() / w[0].item() - 3) < 1e-6
+
+
+def test_deterministic_mode_uses_math_sdpa_only():
+    import torch
+    from xlser.train import seed_all
+    seed_all(0, deterministic=True)
+    b = torch.backends.cuda
+    assert b.math_sdp_enabled() and not b.flash_sdp_enabled() and not b.mem_efficient_sdp_enabled()
+    if hasattr(b, "cudnn_sdp_enabled"):
+        assert not b.cudnn_sdp_enabled()
