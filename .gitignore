@@ -7,3 +7,9 @@ data/raw/
 *.wav
 *.mp4
 wandb/
+missfont.log
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
