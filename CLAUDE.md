@@ -137,3 +137,35 @@ lr 3e-4、patience null、class_weighted_ce false、deterministic true。
 - *→FR 大致與論文一致；目標為 DE 的格子普遍偏低（FR→DE Baseline 1 比 lr 1e-3 時的 74 低 14 分）。
 - **不可據此修改任何設定**：這些都是目標語言（DE / FR）的數字，Upper Bound 的 val / test 也是目標語言。
   lr 依事先規則只由 URDU + MELD 決定。與論文的差距只寫進討論（小語料對 lr / seed 敏感、論文未公開 lr）。
+
+## 架構對齊論文引用的 baseline [14]（2026-11-26）
+
+Mi et al. 未提供 lr、訓練長度、PEFT 細節與特徵層；其 Baseline 1 為 "as in [14]"
+（Han et al., ICASSP 2025, arXiv:2409.16920，程式碼 github.com/zhan7721/Crosslingual_SER），
+backbone 與 PEFT 種類完全相同。讀過 [14] 的論文與程式碼後發現：
+
+| | [14] | 我們原本 |
+|---|---|---|
+| 特徵層 | 逐層分析後截斷在中間層（log 中為 3–8，從未用第 12 層） | 最後一層（12） |
+| LoRA | r 8、α 16、dropout 0.1；q / k / v / out + FFN 兩層，所有保留層 | 只有 q、v，無 dropout |
+| Bottleneck adapter | 768→48→768 ReLU，與 FFN 並聯 | 64 維 GELU，串接並乘純量 gate |
+| Weight gating | 每層輸入乘 sigmoid(g)，g ∈ R^768、初始 1 | 誤解為每個分支一個純量 gate |
+| 分類器 | MLP 768-128-16-4 | 線性（**照 Mi 的公式 11，維持線性**） |
+| 最佳化 | AdamW lr 1e-4、wd 1e-5、一次一句、≤100 epoch | — |
+
+- 已改為 [14] 的 PEFT（`xlser/model.py`），並加入 `feature_layer`（每個來源 backbone 一個值）。
+  依據是引用文獻的程式碼，不是我們的目標語言結果。
+- 先前所有 run（含 lr 3e-4 的選擇）都屬舊架構，作廢；`run_all.sh` 已停止。
+- [14] 的層數是在它自己的資料上選的，不直接沿用。
+
+### 新流程（每一步的規則都在跑之前固定）
+
+1. **選層**：`python scripts/layerwise_probe.py`。凍結 backbone，逐層 mean-pool + 線性分類器。
+   dev 資料：URDU（train 擬合、val + test 共 100 句評分）與 MELD（train 擬合、val 896 句評分），
+   兩者都不是 target。每個 backbone 取兩個 dev 語料 UAR 平均最高的層（平手取較低層），寫入
+   `configs/train.yaml` 的 `feature_layer`。
+2. **選 lr**：新架構下重跑 `scripts/tune_on_urdu.sh` 與 `scripts/tune_lr_on_meld.sh`，規則同前：
+   score = (URDU val 平均 + MELD val) / 2。
+3. **凍結 `configs/train.yaml`**，然後先跑目標為德文的三個 task：`bash scripts/run_target.sh DE 0 1 2 3`
+   （3 tasks × 6 systems × 5 seeds = 90 runs）。
+4. 結果不論與論文差多少，都不回頭調整設定。

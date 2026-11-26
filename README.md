@@ -143,8 +143,7 @@ pytest -q
 speaker head = GRL→Linear→ReLU→Dropout→Linear、LoRA + bottleneck adapter + weight gating、
 各資料集的切分數量。
 
-論文沒寫、放在 [`configs/train.yaml`](configs/train.yaml) 的選擇：τ=0.07、AdamW lr 3e-4（URDU + MELD dev sweep 選出）、
-固定 3000 step（warm-up 100 + cosine）、每 100 step 驗證並保留 val 最佳 checkpoint（不提前停止）、LoRA r=8（q/v）、adapter 維度 64、weight gating 解讀為每個
-LoRA / adapter 分支乘上可學習的 sigmoid gate、訓練隨機裁切 6 s、baseline 使用一般隨機 batch
+論文沒寫、放在 [`configs/train.yaml`](configs/train.yaml) 的選擇：τ=0.07、AdamW lr（URDU + MELD dev sweep 選出，換成 [14] 的 PEFT 後重新選擇中）、
+固定 3000 step（warm-up 100 + cosine）、每 100 step 驗證並保留 val 最佳 checkpoint（不提前停止）、PEFT 照論文 baseline 引用的 [14] 的程式碼（LoRA r 8 / α 16 / dropout 0.1 於 q/k/v/out 與 FFN、48 維並聯 bottleneck adapter、每層輸入的 weight gating），特徵層 `feature_layer` 依 dev 資料逐層分析選定、訓練隨機裁切 6 s、baseline 使用一般隨機 batch
 （batch size 同為 36）、early stopping 指標為訓練語言 val UAR 的語言平均、非官方切分只依
 情緒分層（不做 speaker-independent，因為論文的數量無法做到）。

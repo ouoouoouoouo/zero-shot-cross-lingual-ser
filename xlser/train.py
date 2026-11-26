@@ -253,9 +253,13 @@ def main(argv=None):
             config={"task": a.task, "system": a.system, "backbone": plan.backbone, "tag": a.tag,
                     "protocol_sha256": plan.protocol_sha256, "hparams_sha256": hp_sha, "audit": audit, **hp})
 
+    feature_layer = hp["feature_layer"][plan.source] if isinstance(hp["feature_layer"], dict) else hp["feature_layer"]
+    if plan.backbone == "tiny-random":
+        feature_layer = min(feature_layer, 2)
+    log(f"feature_layer {feature_layer} ({plan.source} backbone)")
     model = SERModel(plan.backbone, len(plan.labels), len(plan.speakers) if plan.spkadv else 0,
-                     hp["lora_rank"], hp["lora_alpha"], hp["adapter_dim"], hp["spk_hidden"],
-                     hp["spk_dropout"], hp["grl_coeff"]).to(a.device)
+                     feature_layer, hp["lora_rank"], hp["lora_alpha"], hp["lora_dropout"], hp["adapter_dim"],
+                     hp["spk_hidden"], hp["spk_dropout"], hp["grl_coeff"]).to(a.device)
     train_info = fit(model, plan, hp, a.device, log, tracker)
 
     # ---- target evaluation: first and only access to target audio ----

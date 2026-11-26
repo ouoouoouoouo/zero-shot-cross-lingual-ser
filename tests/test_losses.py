@@ -71,3 +71,30 @@ def test_deterministic_mode_uses_math_sdpa_only():
     assert b.math_sdp_enabled() and not b.flash_sdp_enabled() and not b.mem_efficient_sdp_enabled()
     if hasattr(b, "cudnn_sdp_enabled"):
         assert not b.cudnn_sdp_enabled()
+
+
+def test_peft_model_truncation_and_trainable_params():
+    import torch
+    from xlser.model import SERModel, load_backbone
+    from transformers import Wav2Vec2Config, Wav2Vec2Model
+    cfg = Wav2Vec2Config(hidden_size=32, num_hidden_layers=4, num_attention_heads=2, intermediate_size=64,
+                         conv_dim=(32, 32), conv_stride=(5, 4), conv_kernel=(10, 4),
+                         num_conv_pos_embeddings=16, num_conv_pos_embedding_groups=4)
+    torch.manual_seed(0)
+    full = Wav2Vec2Model(cfg).eval()
+    wav = torch.randn(1, 8000)
+    with torch.no_grad():
+        ref = full(wav, output_hidden_states=True).hidden_states[2]   # output of 2nd transformer layer
+    import copy
+    m = SERModel(copy.deepcopy(full), 4, n_speakers=3, feature_layer=2, adapter_dim=8).eval()
+    assert len(m.backbone.encoder.layers) == 2
+    trainable = {n.split(".")[-2] if "lora" in n else n for n, p in m.named_parameters() if p.requires_grad}
+    assert all(any(k in n for k in ("lora_", "weighted_gate", "bottleneck", "emotion_head", "speaker_head"))
+               for n, p in m.named_parameters() if p.requires_grad)
+    # with gates at +inf, BA output zeroed and LoRA_B = 0, the PEFT layer reduces to the original layer
+    with torch.no_grad():
+        for layer in m.backbone.encoder.layers:
+            layer.weighted_gate.fill_(1e4)
+            layer.bottleneck[2].weight.zero_(); layer.bottleneck[2].bias.zero_()
+        H = m.backbone(wav).last_hidden_state
+    assert torch.allclose(H, ref, atol=1e-5)

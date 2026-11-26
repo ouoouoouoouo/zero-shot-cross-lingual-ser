@@ -1,8 +1,8 @@
 # Hyper-parameters. Values marked (paper) come from Sec. 3.3; the rest are
 # not reported in the paper and are our choices, shared by every system.
 # Unreported values may be tuned ONLY on the dev tasks (protocol.yaml
-# dev_tasks: *-UR and EN-EN). FROZEN after the URDU + MELD lr sweep; any
-# change invalidates every Table 2 run (hparams_sha256 in run.json).
+# dev_tasks: *-UR and EN-EN). NOT FROZEN (2026-11-26): after switching the PEFT to [14]'s,
+# feature_layer and lr are being re-selected on dev data (see CLAUDE.md). Freeze before Table 2 runs.
 lambda_xling: 2.5        # (paper) language-aware SupCon weight for cross-lingual positives
 alpha: 1.0               # (paper) SupCon loss weight
 beta: 0.3                # (paper) speaker-adversarial loss weight
@@ -13,10 +13,19 @@ temperature: 0.07
 grl_coeff: 1.0
 spk_hidden: 256
 spk_dropout: 0.1
-lora_rank: 8
-lora_alpha: 16
-adapter_dim: 64
-lr: 3.0e-4               # selected on dev tasks with patience null, score = (URDU val mean + MELD val) / 2:
+# PEFT follows the code of the paper's baseline reference [14] (Han et al. 2025): LoRA on
+# q/k/v/out + both FFN linears of every kept layer, parallel bottleneck adapter, weight gating.
+lora_rank: 8             # [14]
+lora_alpha: 16           # [14]
+lora_dropout: 0.1        # [14]
+adapter_dim: 48          # [14] (768 / reduction factor 16)
+feature_layer:           # encoder truncated after this many transformer layers, per SOURCE backbone.
+  EN: 12                 # PLACEHOLDER until scripts/layerwise_probe.py selects it on dev data
+  CN: 12                 # ([14] picks the best layer by a frozen layer-wise analysis; it never
+  DE: 12                 #  uses the last layer for SER). Not tuned on any target language.
+  FR: 12
+lr: 3.0e-4               # PROVISIONAL: re-select under the [14] PEFT. Previous (old PEFT, last layer) sweep,
+                         # score = (URDU val mean + MELD val) / 2:
                          # 1e-4 66.13, 3e-4 68.62, 1e-3 61.88, 3e-3 59.06. 1e-3 collapses on MELD
                          # (grad norm -> 0.35, pooled-feature norm 5 -> 2.8, CE back to the prior entropy).
 weight_decay: 0.01
