@@ -1,0 +1,166 @@
+% 復現進度報告：已知結果與論文對照
+% 編譯：XeLaTeX（Overleaf：Menu → Compiler → XeLaTeX）
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{xeCJK}
+% 繁體中文字型；Overleaf 與多數 TeX Live 都有 Noto CJK。若本機沒有，可改成系統上的中文字型。
+\setCJKmainfont{Noto Serif CJK TC}
+\setCJKsansfont{Noto Sans CJK TC}
+\setCJKmonofont{Noto Sans Mono CJK TC}
+\XeTeXlinebreaklocale "zh"
+\XeTeXlinebreakskip = 0pt plus 1pt
+
+\usepackage[margin=2.2cm]{geometry}
+\usepackage{amsmath}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{threeparttable}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\setlist{itemsep=2pt, topsep=4pt}
+\renewcommand{\arraystretch}{1.15}
+
+% 差距超過 5 個百分點以粗體標示
+\newcommand{\gap}[1]{{\boldmath #1}}
+\renewcommand{\tablename}{表}
+\renewcommand{\refname}{參考文獻}
+
+\title{復現進度報告：\\Learning Emotion-discriminative Representations for\\Zero-Shot Cross-lingual Speech Emotion Recognition}
+\author{}
+\date{2026 年 11 月 26 日}
+
+\begin{document}
+\maketitle
+
+\section{摘要}
+
+本報告整理目前在凍結設定下、與論文 \cite{mi2026} 可直接比較的結果。
+資料前處理、zero-shot protocol 與超參數皆已固定；
+需要中文語料（ESD）的實驗剛開始執行，因此論文的主要結論（Proposed 優於 Baseline~2）尚未驗證。
+
+\begin{itemize}
+  \item 目標語言為法文（CaFE）的 5 項結果與論文大致一致（4 項 UAR 差距在 $\pm 2.1$ 以內，DE$\to$FR Baseline~1 高 5.4）。
+  \item 目標語言為德文（EMO-DB）的結果普遍低於論文，其中 Baseline~1 差距最大（$-13$ 至 $-18$）。
+  \item 依 protocol，這些目標語言的結果\textbf{不用於}任何超參數或設定的調整。
+\end{itemize}
+
+\section{Zero-shot Protocol}
+
+以 EN$\to$DE 為例：訓練、batch sampler、speaker 分類器、early stopping 只使用來源語言與非目標語言
+（EN、CN、FR、UR）的 train / val；正規化為逐句計算，不使用任何語料層級的統計量；
+目標語言 EMO-DB 只在訓練結束、取回最佳 checkpoint 後評估一次（test split，逐句推論）。
+超參數只在 dev task 上選擇：URDU（UR）與 MELD（EN）兩者都不是 9 個 task 的目標語言。
+
+\section{已知結果}
+
+\begin{table}[H]
+\centering
+\begin{threeparttable}
+\caption{Upper Bound 與 Baseline~1：本復現與論文 Table~2 對照（UAR / Macro-F1，\%）}
+\label{tab:results}
+\small
+\begin{tabular}{l l c c r c c r}
+\toprule
+\multirow{2}{*}{系統} & \multirow{2}{*}{Task} & \multicolumn{3}{c}{UAR} & \multicolumn{3}{c}{F1} \\
+\cmidrule(lr){3-5} \cmidrule(lr){6-8}
+ & & 本復現 & 論文 & $\Delta$ & 本復現 & 論文 & $\Delta$ \\
+\midrule
+\multirow{6}{*}{Upper Bound}
+ & EN$\to$DE & 91.22 $\pm$ 6.5  & 97.22 & \gap{$-6.00$}  & 90.03 $\pm$ 7.4  & 97.67 & \gap{$-7.64$} \\
+ & CN$\to$DE & 83.94 $\pm$ 13.7 & 97.22 & \gap{$-13.28$} & 80.29 $\pm$ 17.9 & 97.06 & \gap{$-16.77$} \\
+ & FR$\to$DE & 92.32 $\pm$ 1.6  & 95.44 & $-3.12$        & 93.01 $\pm$ 1.4  & 95.44 & $-2.43$ \\
+ & EN$\to$FR & 87.50 $\pm$ 7.4  & 87.50 & $0.00$         & 85.83 $\pm$ 8.9  & 84.42 & $+1.41$ \\
+ & CN$\to$FR & 90.00 $\pm$ 3.4  & 89.58 & $+0.42$        & 88.45 $\pm$ 3.0  & 91.14 & $-2.69$ \\
+ & DE$\to$FR & 80.00 $\pm$ 7.9  & 81.25 & $-1.25$        & 78.29 $\pm$ 6.8  & 78.00 & $+0.29$ \\
+\midrule
+\multirow{6}{*}{Baseline 1}
+ & EN$\to$DE & 34.20 $\pm$ 5.0  & 52.23 & \gap{$-18.03$} & 24.58 $\pm$ 7.5  & 43.11 & \gap{$-18.53$} \\
+ & CN$\to$DE & \multicolumn{3}{c}{執行中} & \multicolumn{3}{c}{執行中} \\
+ & FR$\to$DE & 60.45 $\pm$ 2.4  & 73.91 & \gap{$-13.46$} & 53.57 $\pm$ 4.4  & 75.17 & \gap{$-21.60$} \\
+ & EN$\to$FR & 43.75 $\pm$ 4.9  & 45.83 & $-2.08$        & 31.45 $\pm$ 4.8  & 39.81 & \gap{$-8.36$} \\
+ & CN$\to$FR & \multicolumn{3}{c}{執行中} & \multicolumn{3}{c}{執行中} \\
+ & DE$\to$FR & 53.33 $\pm$ 7.6  & 47.92 & \gap{$+5.41$}  & 43.90 $\pm$ 6.8  & 47.96 & $-4.06$ \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}\footnotesize
+\item 本復現為 5 個 random seed 的平均 $\pm$ 標準差；論文為單一數值。$\Delta$ = 本復現 $-$ 論文；$|\Delta| > 5$ 以粗體標示。
+\item Upper Bound 以目標語言自身的 train 訓練（非 zero-shot），backbone 為該 task 的來源語言 wav2vec~2.0。
+\item 測試集很小（EMO-DB 38 句、CaFE 42 句），同一設定不同 seed 的 UAR 可相差近 10 個百分點。
+\item 此表的 run 在修正 attention kernel 確定性之前執行：數值有效，但同 seed 無法逐位元重現。
+      最終 Table~2 將在修正後的程式碼上全部重跑（目前執行中）。
+\end{tablenotes}
+\end{threeparttable}
+\end{table}
+
+\paragraph{觀察。}
+\begin{itemize}
+  \item \textbf{目標為法文}：5 項中 4 項的 UAR 差距在 $\pm 2.1$ 以內；DE$\to$FR Baseline~1 高於論文 5.4。
+  \item \textbf{目標為德文}：普遍偏低，且並非都與 MELD 有關。FR$\to$DE Baseline~1（CaFE 訓練）低 13.5，
+        CN$\to$DE Upper Bound 只用 EMO-DB 訓練卻低 13.3（標準差 13.7，個別 seed 表現差）。
+        可能原因：EMO-DB 僅 266 句訓練、38 句測試，對學習率與 seed 敏感；論文未公開學習率與資料切分。
+  \item \textbf{EN$\to$DE Baseline~1}（只用 MELD 訓練）差距最大。MELD 為電視劇自然對話、4 類中 neutral 佔 57\%，
+        本復現在 MELD 自身 val 上的 UAR 約 42。
+\end{itemize}
+
+\section{與論文設定的差異}
+
+\begin{table}[H]
+\centering
+\caption{資料與設定差異}
+\label{tab:deviations}
+\small
+\begin{tabular}{>{\raggedright}p{3.1cm} >{\raggedright}p{5.2cm} >{\raggedright\arraybackslash}p{6.2cm}}
+\toprule
+項目 & 本復現 & 論文 / 說明 \\
+\midrule
+MELD 樣本數（4 類） & train 8,244 / val 896 / test 2,211 & 8,245 / 897 / 2,211。原始發行版缺檔：train \texttt{dia125\_utt3}（無法解碼）、dev \texttt{dia110\_utt7}（缺檔），已排除 \\
+訓練樣本數（EN$\to$DE） & 20,164 & 20,165（差 MELD 缺檔 1 句） \\
+訓練 speaker 數（EN$\to$DE） & 298 & 288。MELD 249 + CN 10 + FR 12 + UR 27；論文計算方式未說明，照實保留 \\
+CaFE 來源 & CAMEO 版（936 句、16~kHz、檔名為 hash） & 原始 CaFE（48~kHz）；speaker / 情緒改由 metadata 取得 \\
+EMO-DB / CaFE / URDU / ESD 切分 & 固定 seed 的分層隨機切分，數量與論文相同 & 論文未公開實際切分；ESD 為 280 / 35 / 35（每位 speaker 每類） \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{超參數}
+\label{tab:hparams}
+\small
+\begin{tabular}{l >{\raggedright}p{5.0cm} >{\raggedright\arraybackslash}p{6.2cm}}
+\toprule
+項目 & 論文 & 本復現 \\
+\midrule
+$\lambda$ / $\alpha$ / $\beta$ & 2.5 / 1.0 / 0.3 & 同論文 \\
+$N_\text{lang}$ / $N_\text{cls}$ / $N_\text{sam}$ & 3 / 4 / 3 & 同論文（batch size 36） \\
+Backbone & 來源語言 wav2vec~2.0 Base & 同論文（4 個 checkpoint 相同） \\
+PEFT & LoRA + bottleneck adapter + weight gating & LoRA $r{=}8$（q, v）、adapter 64 維、sigmoid gate \\
+學習率 & 未提供 & AdamW $3\times10^{-4}$（dev task 上選出） \\
+訓練長度 & 未提供 & 3,000 steps（warm-up 100 + cosine），取 val 最佳 checkpoint \\
+溫度 $\tau$ & 未提供 & 0.07 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{學習率的選擇。}
+規則在看結果前即固定：score $=$（URDU 四個 backbone 的 val UAR 平均 $+$ MELD val UAR）$/\,2$。
+結果為 $10^{-4}$: 66.13、$3\times10^{-4}$: \textbf{68.62}、$10^{-3}$: 61.88、$3\times10^{-3}$: 59.06。
+$10^{-3}$ 在 MELD 上會崩塌為只預測類別先驗（梯度與特徵 norm 持續下降），故不採用。
+
+\section{尚未完成}
+
+\begin{itemize}
+  \item 需要中文語料的實驗：Baseline~2、Proposed、兩個消融、所有 $\ast\to$CN、CN 來源的 Baseline~1
+        （9 tasks $\times$ 6 systems $\times$ 5 seeds $= 270$ runs，執行中）。
+  \item 論文 Figure~2 的 t-SNE 視覺化。
+\end{itemize}
+
+\begin{thebibliography}{9}
+\bibitem{mi2026} J.~Mi, D.~Ma, and T.~Toda,
+  ``Learning Emotion-discriminative Representations for Zero-Shot Cross-lingual Speech Emotion Recognition,''
+  arXiv:2606.06200, 2026.
+\end{thebibliography}
+
+\end{document}
