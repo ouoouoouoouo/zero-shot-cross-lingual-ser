@@ -4,7 +4,7 @@
 # Selection rule (fixed before looking at results, see CLAUDE.md):
 #   score(lr) = ( mean val UAR over EN/CN/DE/FR-UR  +  val UAR on EN-EN ) / 2
 set -euo pipefail
-GPUS=${@:-0}
+GPUS=${*:?"give GPU ids, e.g. 5 4"}
 [ -f data/manifests/EN.csv ] || { echo "data/manifests/EN.csv missing" >&2; exit 1; }
 for lr in 1e-4 3e-4 1e-3 3e-3; do
   for seed in 0 1 2 3 4; do

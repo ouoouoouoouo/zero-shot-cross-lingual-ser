@@ -4,7 +4,7 @@
 # Sweeps lr for every source backbone x 2 seeds, then prints the dev table.
 # The lr is chosen together with scripts/tune_lr_on_meld.sh (see CLAUDE.md).
 set -euo pipefail
-GPUS=${@:-0}
+GPUS=${*:?"give GPU ids, e.g. 5 4"}
 [ -f data/manifests/UR.csv ] || { echo "data/manifests/UR.csv missing: python -m xlser.prepare --lang UR --root <dir>" >&2; exit 1; }
 for lr in 1e-4 3e-4 1e-3 3e-3; do
   for task in EN-UR CN-UR DE-UR FR-UR; do

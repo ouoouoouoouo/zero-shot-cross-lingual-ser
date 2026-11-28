@@ -3,7 +3,7 @@
 #   bash scripts/run_all.sh 0 1 2 3 4 5
 # Only run this after configs/train.yaml has been frozen from the URDU dev sweep.
 set -euo pipefail
-GPUS=${@:-0}
+GPUS=${*:?"give GPU ids, e.g. 5 4"}
 for l in EN CN DE FR UR; do
   [ -f data/manifests/$l.csv ] || { echo "data/manifests/$l.csv missing" >&2; exit 1; }
 done

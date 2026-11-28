@@ -4,7 +4,7 @@
 # MELD; EN is never a Table 2 target), so no DE / FR / CN data is touched.
 #   bash scripts/check_meld_training.sh 0 1 2 3
 set -euo pipefail
-GPUS=${@:-0}
+GPUS=${*:?"give GPU ids, e.g. 5 4"}
 [ -f data/manifests/EN.csv ] || { echo "data/manifests/EN.csv missing" >&2; exit 1; }
 for cw in false true; do
   for seed in 0 1 2 3 4; do
