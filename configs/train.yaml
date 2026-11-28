@@ -20,10 +20,10 @@ lora_alpha: 16           # [14]
 lora_dropout: 0.1        # [14]
 adapter_dim: 48          # [14] (768 / reduction factor 16)
 feature_layer:           # encoder truncated after this many transformer layers, per SOURCE backbone.
-  EN: 12                 # PLACEHOLDER until scripts/layerwise_probe.py selects it on dev data
-  CN: 12                 # ([14] picks the best layer by a frozen layer-wise analysis; it never
-  DE: 12                 #  uses the last layer for SER). Not tuned on any target language.
-  FR: 12
+  EN: 4                  # Selected 2026-11-28 by scripts/layerwise_probe.py on dev data only (URDU + MELD;
+  CN: 5                  # frozen backbone, linear probe per layer, best mean UAR of the two corpora,
+  DE: 3                  # ties -> lower layer). FR: layer 1 67.9 vs layer 5 67.1 / layer 10 67.0,
+  FR: 1                  # within noise but kept as the pre-registered rule dictates.
 lr: 3.0e-4               # PROVISIONAL: re-select under the [14] PEFT. Previous (old PEFT, last layer) sweep,
                          # score = (URDU val mean + MELD val) / 2:
                          # 1e-4 66.13, 3e-4 68.62, 1e-3 61.88, 3e-3 59.06. 1e-3 collapses on MELD

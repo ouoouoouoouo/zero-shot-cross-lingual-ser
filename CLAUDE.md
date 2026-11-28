@@ -164,6 +164,10 @@ backbone 與 PEFT 種類完全相同。讀過 [14] 的論文與程式碼後發�
    dev 資料：URDU（train 擬合、val + test 共 100 句評分）與 MELD（train 擬合、val 896 句評分），
    兩者都不是 target。每個 backbone 取兩個 dev 語料 UAR 平均最高的層（平手取較低層），寫入
    `configs/train.yaml` 的 `feature_layer`。
+   **結果（2026-11-28）**：EN 4、CN 5、DE 3、FR 1，已寫入 `configs/train.yaml`。
+   FR 的領先在雜訊內（第 1 層 67.9、第 5 層 67.1、第 10 層 67.0；URDU 評分 100 句，1 句 ≈ 1 分），
+   依事先規則仍採第 1 層。FR 表：UR 95.0 / EN 40.8 @1；第 12 層僅 60.7。逐層數字存於伺服器
+   `runs_dev/layerwise/selection.json`。
 2. **選 lr**：新架構下重跑 `scripts/tune_on_urdu.sh` 與 `scripts/tune_lr_on_meld.sh`，規則同前：
    score = (URDU val 平均 + MELD val) / 2。
 3. **凍結 `configs/train.yaml`**，然後先跑目標為德文的三個 task：`bash scripts/run_target.sh DE 0 1 2 3`
